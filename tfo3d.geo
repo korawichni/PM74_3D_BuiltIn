@@ -1,9 +1,12 @@
 Include "tfo3d_data.pro";
 
+
 lc_wind = 1.5*rs; //2
 lc_core = 2*lc_wind;
 lc_inf  = 4*lc_core;
 lc_ag = ag/4;
+
+lc0 = lc_wind;
 
 nn_side = 6;
 nn_cen = 4; // layer of the extrusion of the central leg
@@ -13,6 +16,9 @@ nn_thick = 4;
 v_extrude = {-(h-ag)/2,-ag,-(h-ag)/2,-(ho-h)/2};
 nn_cen = {nn_thick,nn_ag,nn_cen,nn_thick};
 
+
+If (1)
+	
 origin = newp;  Point(origin) = {0,    ho/2, 0,   lc_core};
 pntH[] += newp; Point(newp)   = {-ri3, ho/2, 0,   lc_core};
 pntH[] += newp; Point(newp)   = {0,    ho/2, ri3, lc_core};
@@ -105,8 +111,55 @@ For i In {0:3}
   
 EndFor
 
+EndIf
 
+vol_core_thick[] += Translate {0,-(ho+h)/2,0} { Duplicata { Volume{vol_core_thick[]}; } };
+
+vol_core_side[] = Extrude {0,-ho,0} { Surface{surf_side[]}; Layers{nn_side}; }; 
+rot_angle = Pi/2*0 - 0.1 + 1*Atan(ro*Tan(Pi/3)/(ro + ri2));
+all_vol() = Volume '*';
+Rotate {{0, 1, 0}, {0, 0, 0}, rot_angle} {Volume{all_vol()}; }
 //==================== Winding ============================//
+
+
+x0 = xp0; y0 = yp0; zp = zp0; r = rp;
+_use_layers = 40;
+Nturns = 4;
+
+vol_coil[] = {};
+
+
+pnt0[] += newp; Point(newp) = {x0,y0,z0,lc0}; // center
+pnt0[] += newp; Point(newp) = {x0 + r,y0,z0,lc0};
+pnt0[] += newp; Point(newp) = {x0,y0  + r,z0,lc0};
+pnt0[] += newp; Point(newp) = {x0 - r,y0,z0,lc0};
+pnt0[] += newp; Point(newp) = {x0,y0 - r,z0,lc0};
+lncir[] += newl; Circle(newl) = {pnt0[1],pnt0[0],pnt0[2]};
+lncir[] += newl; Circle(newl) = {pnt0[2],pnt0[0],pnt0[3]};
+lncir[] += newl; Circle(newl) = {pnt0[3],pnt0[0],pnt0[4]};
+lncir[] += newl; Circle(newl) = {pnt0[4],pnt0[0],pnt0[1]};
+llcir[] += newll; Line Loop(newll) = lncir[];
+surf_cir[] += news; Plane Surface(news) = newll-1;
+
+
+
+// Straight part: cable(0)
+  aux()   = Extrude{0.,0.,-z0}{ Surface{surf_cir(0)}; Layers{_use_layers}; };
+  vol_coil() += aux(1); // Get the volume from aux(1)
+
+  
+For j In {1:4*Nturns-1}
+// out[1] is the volume
+aux() = Extrude { {0,-(interwire_pri+2*(r+thick_insul))/4,0}, {0,1,0} , {0,0,0} , Pi/2 } {
+	Surface{aux(0)}; Layers{_use_layers/2}; };  // Recombine;
+	vol_coil() += aux(1);
+EndFor
+
+  aux()   = Extrude{z0,0.,0}{ Surface{aux(0)}; Layers{_use_layers}; };
+  vol_coil() += aux(1); // Get the volume from aux(1)
+
+
+//llcir = newll; Line Loop(newll) = lncir[]; 
 /* aux_cen[] = Extrude {0,-(h-ag)/2,0} { Surface{_surf_hole[]}; Layers{nn_cen[1]};  };
 Printf("aux_cen2=",aux_cen[]);
 _surf_hole[] = aux_cen[{0:15:5}];
@@ -132,10 +185,7 @@ vol_core_cen[] += aux_cen[{21:39:6}];
 
 */
 
-vol_core_thick[] += Translate {0,-(ho+h)/2,0} { Duplicata { Volume{vol_core_thick[]}; } };
 
-
-vol_core_side[] = Extrude {0,-ho,0} { Surface{surf_side[]}; Layers{nn_side}; }; 
 
 
 
@@ -149,9 +199,3 @@ Physical Volume ("center leg",3000) = vol_core_cen[];
 Physical Volume ("air tube",4000) = vol_airtube[];
 Physical Volume ("core thick",5000) = vol_core_thick[];
 Physical Volume ("airgap",6000) = vol_ag[];
-
-// pntT[] += newp; Point(newp) = {0,ho/2,0,lc_core};
-// pntT[] += newp; Point(newp) = {0,ho/2,0,lc_core};
-// pntT[] += newp; Point(newp) = {0,ho/2,0,lc_core};
-// pntT[] += newp; Point(newp) = {0,ho/2,0,lc_core};
-// pntT[] += newp; Point(newp) = {0,ho/2,0,lc_core};
