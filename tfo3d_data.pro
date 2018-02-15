@@ -15,20 +15,23 @@ ho = 59*mm; // Height
 
 ag = 3.8*mm;
 
+rot_angle = Pi/2*0 - 0.1 + 1*Atan(ro*Tan(Pi/3)/(ro + ri2));
+
 
 // initial coordinate of the center of the coil in XY plane, where Y is height
 rp = 0.0043/2; interwire_pri = 0.0035;//0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
 rs = 0.00252/2; interwire_sec = 0.003;//0.003676; //0.003;//
 
-z0 = 2*ro;
+lb = 2*ro; // length of the box
+hb = 2*ho; // height of the box
 // xp0 = 0.022775; yp0 = 0.0148+0.001; zp0 = 2*ro; lcp = 3*rp;
 // xs0 = 0.01781; ys0 = 0.01686; zs0 = 2*ro; lcs0 = 2*rs;
 // xs1 = 0.02774; ys1 = 0.01686; zs1 = 2*ro; lcs1 = 3*rs;
 
 
-xp0 = 0.022775; yp0 = 0.0148+0.001; zp0 = z0;
-xs0 = 0.01781; ys0 = 0.01686; zs0 = z0;
-xs1 = 0.02774; ys1 = 0.01686; zs1 = z0;
+xp0 = 0.022775; yp0 = 0.0148+0.001;
+xs0 = 0.01781; ys0 = 0.01686;
+xs1 = 0.02774; ys1 = 0.01686;
 
 
 // GetDP parameters
