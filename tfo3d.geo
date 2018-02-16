@@ -2,7 +2,7 @@ Include "tfo3d_data.pro";
 Geometry.NumSubEdges = 100; // nicer display of curve
 
 // Mesh control parameters
-lc_wind = 1*rs; //2
+lc_wind = 2*rs; //2
 lc_core = 2*lc_wind;
 lc_inf  = 4*lc_core;
 lc_ag = ag/4;
@@ -195,8 +195,7 @@ skin_pri[] = Abs(CombinedBoundary{ Volume{vol_coil_pri()}; });
 
 
 skin_pri[] -= surf_pri_inout[];
-Printf("surf_pri_inout() =", surf_pri_inout());
-Printf("skin_pri() =", skin_pri());
+
 //================ Secondary winding 0 ===========================//
 x0 = xs0; y0 = ys0; z0 = lb; r = rs; lc0 = lc_wind;
 Nturns = Ns; interwire = interwire_sec;
@@ -287,31 +286,6 @@ air_around = newv;
 Volume(air_around) = {sl_box,sl_skin_pri,sl_skin_sec0,sl_skin_sec1,sl_aux};
 
 EndIf
-
-/* aux_cen[] = Extrude {0,-(h-ag)/2,0} { Surface{_surf_hole[]}; Layers{nn_cen[1]};  };
-Printf("aux_cen2=",aux_cen[]);
-_surf_hole[] = aux_cen[{0:15:5}];
-_surf_hole[] += aux_cen[{20:38:6}];
-vol_airtube[] += aux_cen[{1:16:5}];
-vol_core_cen[] += aux_cen[{21:39:6}];
-
-aux_cen[] = Extrude {0,-ag,0} { Surface{_surf_hole[]}; Layers{nn_airgap};  };
-_surf_hole[] = aux_cen[{0:15:5}];
-_surf_hole[] += aux_cen[{20:38:6}];
-vol_airtube[] += aux_cen[{1:16:5}];
-vol_core_cen[] += aux_cen[{21:39:6}];
-
-aux_cen[] = Extrude {0,-(h-ag)/2,0} { Surface{_surf_hole[]}; Layers{nn_cen[1]};  };
-_surf_hole[] = aux_cen[{0:15:5}];
-_surf_hole[] += aux_cen[{20:38:6}];
-vol_airtube[] += aux_cen[{1:16:5}];
-vol_core_cen[] += aux_cen[{21:39:6}];
-
-aux_cen[] = Extrude {0,-(ho-h)/2,0} { Surface{_surf_hole[]}; Layers{nn_cen[0]};  };
-vol_airtube[] += aux_cen[{1:16:5}];
-vol_core_cen[] += aux_cen[{21:39:6}];
-
-*/
 
 Physical Surface ("skin primary",SKIN_PRIMARY) = skin_pri[];
 Physical Surface ("skin secondary0",SKIN_SECONDARY0) = skin_sec0[];

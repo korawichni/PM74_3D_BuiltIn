@@ -31,7 +31,7 @@ Group{
   Surf_S1_Out = #{OUT_SEC1};
 
 
-  Primary     = Region[{Primary_Helix, Primary_In, Primary_Out}];
+  Primary     = Region[{Primary_In, Primary_Out, Primary_Helix}]; //, Primary_In, Primary_Out, Primary_Helix
   Secondary0  = Region[{Secondary0_Helix, Secondary0_In, Secondary0_Out}];
   Secondary1  = Region[{Secondary1_Helix, Secondary1_In, Secondary1_Out}];
   Secondary   = Region[{Secondary0,Secondary1}];
@@ -79,8 +79,10 @@ Function{
   Irms[Secondary] = -Irms_sec; //current in different direction
   Ipk[] = Irms[]*Sqrt[2];
 
-  Ap = -(interwire_pri+rp*2+thick_insul*2)*Np/(10*Np-1);
-  As =  (interwire_sec+rs*2+thick_insul*2)*Ns/(12*Ns-1);
+  //Ap = -(interwire_pri+rp*2+thick_insul*2)*Np/(10*Np-1);
+  //As =  (interwire_sec+rs*2+thick_insul*2)*Ns/(12*Ns-1);
+  Ap = (interwire_pri+rp*2+thick_insul*2)/4;
+  As =  (interwire_sec+rs*2+thick_insul*2)/4;
 
   //vDir[Region[{Air,Core}]] = Vector [ 0, 0, 0];
   vDir[Primary_Helix] =    Unit [ Vector [ Z[], -Ap ,-X[] ] ] ;
@@ -276,7 +278,7 @@ PostProcessing {
       { Name e ; Value { Term { [ -(Dt[{a}]+{d v}) ] ; In DomainC ; Jacobian Vol ; } } }
       { Name j ; Value { Term { [ -sigma[]*(Dt[{a}]+{d v}) ] ; In DomainC ; Jacobian Vol ; } } }
       { Name js ; Value { Term { [ js0[] ]      ; In DomainS ; Jacobian Vol ; } } }
-
+      //{ Name div_js ; Value { Term { [ Div[js0[]] ]      ; In DomainS ; Jacobian Vol ; } } }
 /*       { Name JouleLosses ;
         Value { Integral {
             [ SymmetryFactor * sigma[]*SquNorm[Dt[{a}]+{d v}] ] ;
@@ -334,6 +336,7 @@ PostProcessing {
 
  PostOperation Get_LocalFields UsingPost MagStaDyn_av_js0_3D {
    Print[ js, OnElementsOf DomainS, File StrCat[Dir, "js", ExtGmsh], LastTimeStepOnly ] ;
+   //Print[ div_js, OnElementsOf DomainS, File StrCat[Dir, "div_js", ExtGmsh], LastTimeStepOnly ] ;
    Print[ a, OnElementsOf Domain, File StrCat[Dir, "a", ExtGmsh], LastTimeStepOnly ] ;
    // If(Flag_GaugeType==COULOMB_GAUGE)
      // Print[ xi, OnElementsOf Domain, File StrCat[Dir, "xi",ExtGmsh ], LastTimeStepOnly ] ;
