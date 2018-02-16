@@ -2,23 +2,27 @@ Include "tfo3d_data.pro";
 Geometry.NumSubEdges = 100; // nicer display of curve
 
 // Mesh control parameters
-lc_wind = 1.5*rs; //2
+lc_wind = 1*rs; //2
 lc_core = 2*lc_wind;
 lc_inf  = 4*lc_core;
 lc_ag = ag/4;
 
 // Extrusion parameters
 v_extrude = { -(h-ag)/2, -ag, -(h-ag)/2, -(ho-h)/2 };
-nn_side = 6;
-nn_cen = 4; // layer of the extrusion of the central middle part
-nn_ag = 4; // layer of the airgap
+nn_side = 10;
+nn_core_cen = 6; // layer of the extrusion of the central middle part
+nn_ag = 6; // layer of the airgap
 nn_thick = 4; // layer of the base
-nn_cen = { nn_thick, nn_ag, nn_cen, nn_thick };
+nn_cen = { nn_core_cen, nn_ag, nn_core_cen, nn_thick };
 
 // Layer of extruded wire
-layer_pri = 40;
-layer_sec0 = 40;
-layer_sec1 = 40;
+layer_p_straight = 40;
+layer_s0_straight = 40;
+layer_s1_straight = 40;
+
+layer_p_spiral = layer_p_straight/2;
+layer_s0_spiral = layer_s0_straight/2;
+layer_s1_spiral = layer_s1_straight/2;
 
 If (1)
 	
@@ -159,18 +163,18 @@ Macro DrawWinding
   surf_cir = news; Plane Surface(news) = newll-1;
   
 // Starting straight part: cable(0)
-  aux() = Extrude{0.,0.,-z0}{ Surface{surf_cir}; Layers{_use_layers}; };
+  aux() = Extrude{0.,0.,-z0}{ Surface{surf_cir}; Layers{_use_layers_straight}; };
   vol_coil() += aux(1); // Get the volume from aux(1)
   surf_inout() = surf_cir; // Collect the surface
-// Spiral part every one quarter for smooth curve
+// Spiral part every 1/4 for smooth curve
   For j In {1:4*Nturns-1}
-	aux() = Extrude { {0,-(interwire+2*(r+thick_insul))/4,0}, {0,1,0} , {0,0,0} , 2*Pi/4 } {
-	Surface{aux(0)}; Layers{_use_layers/2}; };  // Recombine;
+	aux() = Extrude { { 0, -(interwire+2*(r+thick_insul))/4, 0 }, {0, 1, 0}, {0, 0, 0}, 2*Pi/4 } {
+	Surface{aux(0)}; Layers{_use_layers_spiral}; };  // Recombine;
 	vol_coil() += aux(1);
   EndFor
   
 // Ending straight part
-  aux()   = Extrude{z0,0.,0}{ Surface{aux(0)}; Layers{_use_layers}; };
+  aux()   = Extrude{z0,0.,0}{ Surface{aux(0)}; Layers{_use_layers_straight}; };
   vol_coil() += aux(1); // Get the volume from aux(1)
   surf_inout() += aux(0); // Collect the out surface
   
@@ -179,7 +183,9 @@ Return
 //================ Primary winding ===========================//
 x0 = xp0; y0 = yp0; z0 = lb; r = rp; lc0 = lc_wind;
 Nturns = Np; interwire = interwire_pri;
-_use_layers = layer_pri;
+_use_layers_straight = layer_p_straight;
+_use_layers_spiral = layer_p_spiral;
+
 Call DrawWinding;
 vol_coil_pri() = vol_coil();
 surf_pri_inout() = surf_inout();
@@ -194,7 +200,8 @@ Printf("skin_pri() =", skin_pri());
 //================ Secondary winding 0 ===========================//
 x0 = xs0; y0 = ys0; z0 = lb; r = rs; lc0 = lc_wind;
 Nturns = Ns; interwire = interwire_sec;
-_use_layers = layer_sec0;
+_use_layers_straight = layer_s0_straight; 
+_use_layers_spiral = layer_s0_spiral;
 Call DrawWinding;
 vol_coil_sec0() = vol_coil();
 surf_sec0_inout() = surf_inout();
@@ -207,7 +214,8 @@ skin_sec0[] -= surf_sec0_inout[];
 //================ Secondary winding 1 ===========================//
 x0 = xs1; y0 = ys1; z0 = lb; r = rs; lc0 = lc_wind;
 Nturns = Ns; interwire = interwire_sec;
-_use_layers = layer_sec1;
+_use_layers_straight = layer_s1_straight;
+_use_layers_spiral = layer_s1_spiral;
 Call DrawWinding;
 vol_coil_sec1() = vol_coil();
 surf_sec1_inout() = surf_inout();
@@ -305,26 +313,42 @@ vol_core_cen[] += aux_cen[{21:39:6}];
 
 */
 
-Physical Surface ("skin primary",1000) = skin_pri[];
-Physical Surface ("skin secondary0",1001) = skin_sec0[];
-Physical Surface ("skin aux",1002) = skin_aux[];
-Physical Surface ("in pri",1003) = surf_pri_inout[0];
-Physical Surface ("in sec0",1004) = surf_sec0_inout[0];
-Physical Surface ("in sec1",1005) = surf_sec1_inout[0];
-Physical Surface ("out pri",1006) = surf_pri_inout[1];
-Physical Surface ("out sec0",1007) = surf_sec0_inout[1];
-Physical Surface ("out sec1",1008) = surf_sec1_inout[1];
+Physical Surface ("skin primary",SKIN_PRIMARY) = skin_pri[];
+Physical Surface ("skin secondary0",SKIN_SECONDARY0) = skin_sec0[];
+Physical Surface ("skin aux",9999) = skin_aux[];
+Physical Surface ("in surface pri",IN_PRI) = surf_pri_inout[0];
+Physical Surface ("in surface sec0",IN_SEC0) = surf_sec0_inout[0];
+Physical Surface ("in surface sec1",IN_SEC1 ) = surf_sec1_inout[0];
+Physical Surface ("out surface pri", OUT_PRI) = surf_pri_inout[1];
+Physical Surface ("out surface sec0",OUT_SEC0) = surf_sec0_inout[1];
+Physical Surface ("out surface sec1",OUT_SEC1) = surf_sec1_inout[1];
+Physical Surface ("air boundary",SURF_AIROUT) = surf_box[];
 
-Physical Volume ("side legs",2000) = vol_core_side[];
-Physical Volume ("center leg",3000) = vol_core_cen[];
-Physical Volume ("air tube",4000) = vol_airtube[];
-Physical Volume ("core thick",5000) = vol_core_thick[];
-Physical Volume ("airgap",6000) = vol_ag[];
-Physical Volume ("primary",7000) = vol_coil_pri[];
-Physical Volume ("secondary0",8000) = vol_coil_sec0[];
-Physical Volume ("secondary1",8100) = vol_coil_sec1[];
-Physical Volume ("core",9000) = vol_core[];
-Physical Volume ("air around",10000) = air_around;
+Physical Volume ("side legs",20000) = vol_core_side[];
+Physical Volume ("center leg",30000) = vol_core_cen[];
+Physical Volume ("air tube",40000) = vol_airtube[];
+Physical Volume ("core thick",50000) = vol_core_thick[];
+Physical Volume ("airgap",60000) = vol_ag[];
+//Physical Volume ("primary",PRIMARY) = vol_coil_pri[];
+//Physical Volume ("secondary0",SECONDARY0) = vol_coil_sec0[];
+//Physical Volume ("secondary1",SECONDARY1) = vol_coil_sec1[];
+Physical Volume ("core",CORE) = vol_core[];
+Physical Volume ("air around",100000) = air_around;
+Physical Volume ("air",AIR) = {air_around,vol_ag[],vol_airtube[]};
+
+nnp = #vol_coil_pri()-1;
+Physical Volume ("Primary helix", PRIMARY+0) = vol_coil_pri({1:nnp-1});
+Physical Volume ("Primary in",    PRIMARY+1) = vol_coil_pri(0);
+Physical Volume ("Primary out",   PRIMARY+2) = vol_coil_pri(nnp);
+
+nns = #vol_coil_sec0()-1;
+Physical Volume ("Secondary 0 helix", SECONDARY0+0) = vol_coil_sec0({1:nns-1});
+Physical Volume ("Secondary 0 in",    SECONDARY0+1) = vol_coil_sec0(0);
+Physical Volume ("Secondary 0 out",   SECONDARY0+2) = vol_coil_sec0(nns);
+
+Physical Volume ("Secondary 1 helix", SECONDARY1+0) = vol_coil_sec1({1:nns-1});
+Physical Volume ("Secondary 1 in",    SECONDARY1+1) = vol_coil_sec1(0);
+Physical Volume ("Secondary 1 out",   SECONDARY1+2) = vol_coil_sec1(nns);
 
 
 // For aestetics

@@ -15,7 +15,7 @@ ho = 59*mm; // Height
 
 ag = 3.8*mm;
 
-rot_angle = Pi/2*0 - 0.1 + 1*Atan(ro*Tan(Pi/3)/(ro + ri2));
+rot_angle = Pi/2*0 - 0.1 + 1*Atan[ro*Tan[Pi/3]/(ro + ri2)];
 
 
 // initial coordinate of the center of the coil in XY plane, where Y is height
