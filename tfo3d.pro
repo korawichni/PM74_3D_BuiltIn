@@ -10,17 +10,21 @@ Group{
   Core = #CORE;
   Air = #AIR;
 
-  Primary_Helix    = #PRIMARY;
-  Secondary0_Helix = #SECONDARY0;
-  Secondary1_Helix = #SECONDARY1;
+  // Primary_Helix    = #PRIMARY;
+  // Secondary0_Helix = #SECONDARY0;
+  // Secondary1_Helix = #SECONDARY1;
+  
+  // Primary_In    = #{(PRIMARY+1)};
+  // Secondary0_In = #{(SECONDARY0+1)};
+  // Secondary1_In = #{(SECONDARY1+1)};
 
-  Primary_In    = #{(PRIMARY+1)};
-  Secondary0_In = #{(SECONDARY0+1)};
-  Secondary1_In = #{(SECONDARY1+1)};
-
-  Primary_Out    = #{(PRIMARY+2)};
-  Secondary0_Out = #{(SECONDARY0+2)};
-  Secondary1_Out = #{(SECONDARY1+2)};
+  // Primary_Out    = #{(PRIMARY+2)};
+  // Secondary0_Out = #{(SECONDARY0+2)};
+  // Secondary1_Out = #{(SECONDARY1+2)};
+  
+  Primary    = #PRIMARY;
+  Secondary0 = #SECONDARY0;
+  Secondary1 = #SECONDARY1;
 
   Surf_P_In  = #{IN_PRI};
   Surf_S0_In = #{IN_SEC0};
@@ -31,9 +35,9 @@ Group{
   Surf_S1_Out = #{OUT_SEC1};
 
 
-  Primary     = Region[{Primary_In, Primary_Out, Primary_Helix}]; //, Primary_In, Primary_Out, Primary_Helix
-  Secondary0  = Region[{Secondary0_Helix, Secondary0_In, Secondary0_Out}];
-  Secondary1  = Region[{Secondary1_Helix, Secondary1_In, Secondary1_Out}];
+  // Primary     = Region[{Primary_In, Primary_Out, Primary_Helix}]; //, Primary_In, Primary_Out, Primary_Helix
+  // Secondary0  = Region[{Secondary0_Helix, Secondary0_In, Secondary0_Out}];
+  // Secondary1  = Region[{Secondary1_Helix, Secondary1_In, Secondary1_Out}];
   Secondary   = Region[{Secondary0,Secondary1}];
 
   Surf_In  = Region[{Surf_P_In,  Surf_S0_In,  Surf_S1_In}];
@@ -85,12 +89,33 @@ Function{
   As =  (interwire_sec+rs*2+thick_insul*2)/4;
 
   //vDir[Region[{Air,Core}]] = Vector [ 0, 0, 0];
-  vDir[Primary_Helix] =    Unit [ Vector [ Z[], -Ap ,-X[] ] ] ;
+/*   vDir[Primary_Helix] =    Unit [ Vector [ Z[], -Ap ,-X[] ] ] ;
   vDir[Secondary0_Helix] = Unit [ Vector [ Z[], -As ,-X[] ] ] ;
   vDir[Secondary1_Helix] = Unit [ Vector [ Z[], -As ,-X[] ] ] ;
 
   vDir[Region[{Primary_In,  Secondary0_In,  Secondary1_In}]]  = Vector [0., 0.,-1.] ;
-  vDir[Region[{Primary_Out, Secondary0_Out, Secondary1_Out}]] = Vector [1., 0., 0.] ;
+  vDir[Region[{Primary_Out, Secondary0_Out, Secondary1_Out}]] = Vector [1., 0., 0.] ; */
+  
+  // Ap = -(interwire_pri+rp*2+thick_insul*2)*Np/(10*Np-1);
+  // As = (interwire_sec+rs*2+thick_insul*2)*Ns/(12*Ns-1);
+
+  eps = 1e-3;
+  _tmp_pri = yp0+rp-(interwire_pri+2*(rp+thick_insul))*(Np-0.25) + eps;	//0.25
+  _tmp_sec = ys0+rs-(interwire_sec+2*(rs+thick_insul))*(Ns-0.25) + eps;
+
+
+  vDir[Primary] = ( (Y[] >= yp0-rp && Z[] >=0) ? Vector [0,0,-1]:
+					(Y[]<= _tmp_pri  && X[] >=0 && Z[] >=0) ? Vector [1,0,0]: 
+					Unit [ Vector [ Z[], -Ap ,-X[] ] ] );
+  vDir[Secondary] = ( (Y[] >= ys0-rs && Z[] >=0) ? Vector [0,0,-1]:
+					(Y[]<=  _tmp_sec && X[] >=0 && Z[] >=0) ? Vector [1,0,0]:
+					Unit [ Vector [ Z[], -As ,-X[] ] ] );
+  // vDir[Secondary1] = ( (Y[] >= ys0-rs && Z[] >=0) ? Vector [0,0,-1]:
+					// (Y[]<= _tmp_sec && X[] >=0 && Z[] >=0) ? Vector [1,0,0]:
+					// Unit [ Vector [ Z[], -As ,-X[] ] ] );
+					
+					// y[] <= -0.014195
+  vDir[Region[{Air,Core}]] = Vector [ 0, 0, 0];				
 
   // SurfCoil[] = Pi*radius[]*radius[]; // Ok but better to take the actual section of one of the in or out surfaces
   SurfCoil[Primary]    = SurfaceArea[]{IN_PRI};
@@ -263,11 +288,11 @@ Resolution {
 }
 
 PostProcessing {
-/*   { Name TangentVector ; NameOfFormulation FindVector ;
+  { Name TangentVector ; NameOfFormulation MagStaDyn_av_js0_3D ;
     PostQuantity {
       { Name vdir; Value { Term { [ vDir[] ] ; In Domain ; Jacobian Vol ; } } }
     }
-  } */
+  } 
   { Name MagStaDyn_av_js0_3D ; NameOfFormulation MagStaDyn_av_js0_3D ;
     PostQuantity {
       { Name a ; Value { Term { [ {a} ]          ; In Domain ; Jacobian Vol ; } } }
@@ -329,10 +354,10 @@ PostProcessing {
 }
 
 //========================================================================================
-/*  PostOperation ShowTangentVector UsingPost TangentVector {
+  PostOperation ShowTangentVector UsingPost TangentVector {
 // added
    Print[ vdir, OnElementsOf Domain, File StrCat[Dir,"vdir",ExtGmsh] ] ;
- } */
+ }
 
  PostOperation Get_LocalFields UsingPost MagStaDyn_av_js0_3D {
    Print[ js, OnElementsOf DomainS, File StrCat[Dir, "js", ExtGmsh], LastTimeStepOnly ] ;

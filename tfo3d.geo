@@ -272,7 +272,7 @@ surf_box[] += news; Plane Surface(news) = {llb+5,ll_pri_out,ll_sec0_out,ll_sec1_
 
 sl_box = newsl; Surface Loop(sl_box) = surf_box[];
 
-// Prepare surface loops to subtract from the box
+/* // Prepare surface loops to subtract from the box
 sl_skin_pri = newsl; Surface Loop(sl_skin_pri) = skin_pri[];
 sl_skin_sec0 = newsl; Surface Loop(sl_skin_sec0) = skin_sec0[];
 sl_skin_sec1 = newsl; Surface Loop(sl_skin_sec1) = skin_sec1[];
@@ -281,15 +281,26 @@ vol_aux = {vol_core[],vol_ag[],vol_airtube[]};
 skin_aux[] =  Abs(CombinedBoundary{ Volume{vol_aux[]}; });
 sl_aux[] += newsl; Surface Loop(newsl) = Abs(CombinedBoundary{ Volume{vol_aux[]}; });
 
+
 // Create air around
 air_around = newv;
-Volume(air_around) = {sl_box,sl_skin_pri,sl_skin_sec0,sl_skin_sec1,sl_aux};
+//Volume(air_around) = {sl_box,sl_skin_pri,sl_skin_sec0,sl_skin_sec1,sl_aux};
+
+ */
+
+air_around = newv;
+
+vol_aux = {vol_core[],vol_ag[],vol_airtube[]};
+sl_aux[] += newsl; Surface Loop(newsl) = Abs(CombinedBoundary{ Volume{vol_aux[]}; });
+
+sl_tmp = newsl; Surface Loop(sl_tmp) = {surf_box[],skin_pri[],skin_sec0[],skin_sec1[]};
+Volume(air_around) = {sl_tmp,sl_aux};
 
 EndIf
 
 Physical Surface ("skin primary",SKIN_PRIMARY) = skin_pri[];
 Physical Surface ("skin secondary0",SKIN_SECONDARY0) = skin_sec0[];
-Physical Surface ("skin aux",9999) = skin_aux[];
+//Physical Surface ("skin aux",9999) = skin_aux[];
 Physical Surface ("in surface pri",IN_PRI) = surf_pri_inout[0];
 Physical Surface ("in surface sec0",IN_SEC0) = surf_sec0_inout[0];
 Physical Surface ("in surface sec1",IN_SEC1 ) = surf_sec1_inout[0];
@@ -311,19 +322,23 @@ Physical Volume ("air around",100000) = air_around;
 Physical Volume ("air",AIR) = {air_around,vol_ag[],vol_airtube[]};
 
 nnp = #vol_coil_pri()-1;
-Physical Volume ("Primary helix", PRIMARY+0) = vol_coil_pri({1:nnp-1});
-Physical Volume ("Primary in",    PRIMARY+1) = vol_coil_pri(0);
-Physical Volume ("Primary out",   PRIMARY+2) = vol_coil_pri(nnp);
+// Physical Volume ("Primary helix", PRIMARY+0) = vol_coil_pri({1:nnp-1});
+// Physical Volume ("Primary in",    PRIMARY+1) = vol_coil_pri(0);
+// Physical Volume ("Primary out",   PRIMARY+2) = vol_coil_pri(nnp);
+Physical Volume ("Primary", PRIMARY+0) = vol_coil_pri();
+
+Printf("primary=",vol_coil_pri());
 
 nns = #vol_coil_sec0()-1;
-Physical Volume ("Secondary 0 helix", SECONDARY0+0) = vol_coil_sec0({1:nns-1});
-Physical Volume ("Secondary 0 in",    SECONDARY0+1) = vol_coil_sec0(0);
-Physical Volume ("Secondary 0 out",   SECONDARY0+2) = vol_coil_sec0(nns);
+// Physical Volume ("Secondary 0 helix", SECONDARY0+0) = vol_coil_sec0({1:nns-1});
+// Physical Volume ("Secondary 0 in",    SECONDARY0+1) = vol_coil_sec0(0);
+// Physical Volume ("Secondary 0 out",   SECONDARY0+2) = vol_coil_sec0(nns);
+Physical Volume ("Secondary 0", SECONDARY0+0) = vol_coil_sec0();
 
-Physical Volume ("Secondary 1 helix", SECONDARY1+0) = vol_coil_sec1({1:nns-1});
-Physical Volume ("Secondary 1 in",    SECONDARY1+1) = vol_coil_sec1(0);
-Physical Volume ("Secondary 1 out",   SECONDARY1+2) = vol_coil_sec1(nns);
-
+// Physical Volume ("Secondary 1 helix", SECONDARY1+0) = vol_coil_sec1({1:nns-1});
+// Physical Volume ("Secondary 1 in",    SECONDARY1+1) = vol_coil_sec1(0);
+// Physical Volume ("Secondary 1 out",   SECONDARY1+2) = vol_coil_sec1(nns);
+ Physical Volume ("Secondary 1", SECONDARY1+0) = vol_coil_sec1();
 
 // For aestetics
 Recursive Color SkyBlue { Volume{air_around,vol_ag(),vol_airtube()};}

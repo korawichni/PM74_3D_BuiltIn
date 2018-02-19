@@ -19,7 +19,7 @@ rot_angle = Pi/2*0 - 0.1 + 1*Atan[ro*Tan[Pi/3]/(ro + ri2)];
 
 
 // initial coordinate of the center of the coil in XY plane, where Y is height
-rp = 0.0043/2; interwire_pri = 0.0035;//0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
+rp = 0.0043/2; interwire_pri = 0.004;//0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles 0.0035
 rs = 0.00252/2; interwire_sec = 0.003;//0.003676; //0.003;//
 
 lb = 2*ro; // length of the box
