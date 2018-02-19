@@ -14,11 +14,17 @@ DIVJ0_NONE = 0;
 DIVJ0_WEAK = 1;
 DIVJ0_STRONG = 2; // => to add, implementation phase
 
+STA=0;
+DYN=1;
+
 simp = Str["Simulation param./"];
 
 DefineConstant[
   _winding_model = {0, Choices{0="stranded",1="massive"},
     Name StrCat[simp,"00Winding model"], Highlight "Blue"}
+  _analysis_type = {_winding_model==MASSIVE ? DYN : STA , Choices{0="magnetostatics",1="magnetodynamic"},
+    Name StrCat[simp,"00Choose analysis type"], Highlight "Blue", ReadOnly (_winding_model==MASSIVE)}
+
   _divJ_zero = { DIVJ0_WEAK,
     Choices{ DIVJ0_NONE   = "none",
              DIVJ0_WEAK   = "weak",
@@ -92,9 +98,11 @@ Group{
 
     Surf_Elec = Region[{Surf_In}];
     DomainS   = Region[{}];
+    SkinDomainS  = Region[{}];
+
     NbSrc_DomainB = 0;
     DomainB = Region[{}];
-    SkinDomainB = Region[}];
+    SkinDomainB = Region[{}];
   EndIf
   DomainCC += Region[{DomainS, DomainB}];
 
@@ -255,7 +263,7 @@ Constraint {
         { Region Surf_S1_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
       EndIf
       If(_winding_model==STRANDED)
-        { Region Primary    ; Type Assign ; Value IA[] ; TimeFunction 1.; }
+        { Region Primary    ; Type Assign ; Value -IA[] ; TimeFunction 1.; }
       EndIf
     }
   }
@@ -524,13 +532,16 @@ Resolution {
 
   { Name Analysis ; // not completely general: to adapt
     System {
-      If( _winding_model==STRANDED)
+      If( _analysis_type==STA)
         If(_divJ_zero == DIVJ0_WEAK)
           { Name Sys_DivJ0 ; NameOfFormulation DivJ0 ; }
         EndIf
         { Name Sys ; NameOfFormulation MagStaDyn_av_js0_3D ; } // static
-      Else
-       { Name Sys ; NameOfFormulation MagStaDyn_av_js0_3D ; Type ComplexValue ; Frequency Freq ; }
+       Else
+        If(_divJ_zero == DIVJ0_WEAK)
+          { Name Sys_DivJ0 ; NameOfFormulation DivJ0 ; Type ComplexValue ; Frequency Freq ;}
+        EndIf
+        { Name Sys ; NameOfFormulation MagStaDyn_av_js0_3D ; Type ComplexValue ; Frequency Freq ; }
       EndIf
      }
     Operation {
@@ -541,8 +552,8 @@ Resolution {
       EndIf
       InitSolution[Sys];
       Generate[Sys] ; Solve[Sys] ; SaveSolution[Sys];
-    PostOperation[Get_LocalFields] ;
-    PostOperation[Get_GlobalQuantities] ;
+      PostOperation[Get_LocalFields] ;
+    //PostOperation[Get_GlobalQuantities] ;
     }
   }
 }
@@ -600,7 +611,7 @@ PostProcessing {
 
       // Not a good idea to use the functions...
       { Name Inductance_from_Flux ; Value { Term { Type Global; [ $Flux * 1e3/IA_pri ] ; In DomainDummy ; } } }
-      { Name Inductance_from_MagEnergy ; Value { Term { Type Global; [ 2 * $MagEnergy * 1e3/(IA_sec0*IA_sec0) ] ; In DomainDummy ; } } }
+      { Name Inductance_from_MagEnergy ; Value { Term { Type Global; [ 2 * $MagEnergy * 1e3/(IA_pri*IA_pri) ] ; In DomainDummy ; } } }
       { Name Resistance ; Value { Term { Type Global; [ 2 * $JouleLosses /(IA_pri*IA_pri) ] ; In DomainDummy ; } } }
     }
   }
@@ -657,6 +668,6 @@ PostProcessing {
 
 DefineConstant[
   R_ = {"Analysis", Name "GetDP/1ResolutionChoices", Visible 1},
-  C_ = {"-solve -v 3 -v2 -pos", Name "GetDP/9ComputeCommand", Visible 1},
+  C_ = {"-solve -v 3 -v2", Name "GetDP/9ComputeCommand", Visible 1},
   P_ = {"", Name "GetDP/2PostOperationChoices", Visible 1}
 ];
