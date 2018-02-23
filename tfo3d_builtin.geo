@@ -10,7 +10,7 @@ General.ExpertMode = 1;
 _use_recombine=0;// 1 not possible with the current meshing algorithms
 
 // Mesh control parameters
-lc_wind = 1.5*rs; //2
+lc_wind = 1*rs; //2 1.5
 lc_core = 2*lc_wind;
 lc_inf  = 4*lc_core;
 lc_ag = ag/4;

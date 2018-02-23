@@ -22,10 +22,11 @@ simp = Str["Simulation param./"];
 DefineConstant[
   _winding_model = {0, Choices{0="stranded",1="massive"},
     Name StrCat[simp,"00Winding model"], Highlight "Blue"}
+	
   _analysis_type = {_winding_model==MASSIVE ? DYN : STA , Choices{0="magnetostatics",1="magnetodynamic"},
     Name StrCat[simp,"00Choose analysis type"], Highlight "Blue", ReadOnly (_winding_model==MASSIVE)}
 
-  _divJ_zero = { DIVJ0_WEAK,
+  _divJ_zero = { DIVJ0_STRONG,
     Choices{ DIVJ0_NONE   = "none",
              DIVJ0_WEAK   = "weak",
              DIVJ0_STRONG = "strong"},
@@ -34,6 +35,9 @@ DefineConstant[
       "Weak: Use scalar potential xis for weakly ensuring div j = 0.",
       "Strong: Use Hcurl source field hs with curl hs = j, for div j = 0;"],
     Highlight "Blue",  Visible (_winding_model==STRANDED)}
+	
+  _flag_circuit_coupling = {1, Choices{0,1}, Name StrCat[simp,"02Circuit Coupling"]}
+  
 ];
 
 Group{
@@ -172,7 +176,7 @@ Function{
   IA[#{Secondary0, Surf_S0_In}] = IA_sec0;
   IA[#{Secondary1, Surf_S1_In}] = IA_sec1;
 
-  IA[#{Air,Core}] = IA_pri;
+  IA[#{Air,Core}] = IA_pri*0;
 
   Ap = (interwire_pri+2*(rp+thick_insul))/4;
   As = (interwire_sec+2*(rs+thick_insul))/4;
@@ -237,6 +241,142 @@ Integration {
   }
 }
 
+// ---------
+//  Circuit
+// ---------
+If (_flag_circuit_coupling)
+	
+  Group {
+    VI_source_pri = # 2000001 ;
+    Rs_pri  = # 2000002 ;
+	//Rz_pri = # 2000003 ;
+	
+    VI_source_sec = # 2000004 ;
+    Rs_sec  = # 2000005 ;
+	//Rz_sec = # 2000006 ;
+	
+    //Resistance_Cir  = Region[ {Rs_pri,Rz_pri,Rs_sec,Rz_pri} ] ;
+    Resistance_Cir  = Region[ {Rs_pri,Rs_sec} ] ;
+    Inductance_Cir  = Region[ {} ] ;
+
+    Capacitance1_Cir = Region[ {} ] ;
+    Capacitance2_Cir = Region[ {} ] ;
+    Capacitance_Cir = Region[ {Capacitance1_Cir, Capacitance2_Cir} ] ;
+
+    Diode_Cir  = Region[ {} ] ;
+
+    SourceV_Cir = Region[ { } ] ;
+    //SourceI_Cir = Region[ {VI_source_pri, VI_source_sec} ] ;
+    SourceI_Cir = Region[ {VI_source_pri, VI_source_sec} ] ;
+
+    DomainZ_Cir = Region[ {Resistance_Cir, Inductance_Cir, Capacitance_Cir,
+                           Diode_Cir} ] ;
+    DomainSource_Cir = Region[ {SourceV_Cir, SourceI_Cir} ] ;
+
+    DomainZt_Cir = Region[ {DomainZ_Cir, DomainSource_Cir} ] ;
+  }
+  
+  Function {
+	DefineFunction[ Resistance ];
+	// If (!Flag_Ic)
+	  // Resistance[Rc] = Rload ;
+	// EndIf
+	// If (Flag_Ic)
+	  Resistance[#{Rs_pri,Rs_sec}] = 1e50;
+  	  //Resistance[#{Rz_pri,Rz_sec}] = 1;
+	//EndIf
+  }
+  
+  Constraint {
+    { Name Current_Cir ;
+    Case {
+	If(_analysis_type == STA) // Static and imposed current
+		{ Region VI_source_pri ; Value Irms_pri ;}
+		{ Region VI_source_sec ; Value Irms_sec ;}
+	EndIf
+	If(_analysis_type == DYN) // sinusoidal voltage source, either TL or FD   
+      { Region VI_source_pri ; Value IA_pri ; TimeFunction F_Cos_wt_p[]{2*Pi*Freq,0} ; } 
+	  { Region VI_source_sec ; Value IA_sec0 ; TimeFunction F_Cos_wt_p[]{2*Pi*Freq,0} ; } 
+	EndIf
+      }
+    }
+	
+    { Name Voltage_Cir ; Case { } }	
+
+  // { Name Voltage_Cir ;
+    // Case {
+	// If(_analysis_type == STA) // Static and imposed voltage
+		// { Region VI_Source ; Value Vc ;}
+	// EndIf
+	// If(Flag_TL && !Flag_SinusVI && Flag_Vc /*Flag_TL_Vstep*/) // TL and voltage step
+        // { Region VI_Source ; Value Vquasi_sq_TL ; TimeFunction Quasi_sq[] ;  }         
+    // EndIf
+	// If(_analysis_type == DYN) // sinusoidal voltage source, either TL or FD   
+      // { Region VI_Source ; Value Vpri_pk ; TimeFunction F_Cos_wt_p[]{2*Pi*Freq,Vc_ph*Pi/180} ; } 
+	// EndIf
+    // }
+  // }
+
+    { Name ElectricalCircuit ; Type Network ;
+
+//      1 _________ -- Vi_source_pri --> _________ 3
+//      |                                          |
+//      |_________ Rz_pri ______2____ Primary _____|
+//		|							               |
+//		|___________________Rs_pri_________________|
+
+	  Case Circuit1 {
+		If (Np > 0)
+		  { Region Primary ; Branch {1, 2} ; }
+		EndIf 
+		
+		//{ Region Rz_pri ; Branch {1, 2} ; }
+		{ Region VI_source_pri ; Branch {1, 2} ; }
+		{ Region Rs_pri; Branch {1, 2} ; }
+	  }
+	
+//      1 ______________ -- Vi_source_sec --> _____________ 4
+//      |                                                   |
+//      |___ Rz_sec ___2___ Secondary0 __3__ Secondary1_____|
+//		|							                        |
+//		|______________________Rs_sec_______________________|
+	
+      Case Circuit2 {
+		If (Ns > 0)
+		  { Region Secondary0 ; Branch {1, 2} ; }
+		  { Region Secondary1 ; Branch {3, 2} ; }
+		EndIf
+		
+		//{ Region Rz_sec ; Branch {1, 2} ; }		
+		{ Region VI_source_sec ; Branch {1, 3} ; }
+		{ Region Rs_sec; Branch {1, 3} ; } // Need this to make it well-conditioned
+	  }	 
+   } 
+  } // End of Constraint
+  
+  // UZ and IZ for impedances
+  FunctionSpace {
+    { Name Hregion_Z ; Type Scalar ;
+      BasisFunction {
+        { Name sr ; NameOfCoef ir ; Function BF_Region ;
+          Support DomainZt_Cir ; Entity DomainZt_Cir ; }
+      }
+      GlobalQuantity {
+        { Name Iz ; Type AliasOf        ; NameOfCoef ir ; }
+        { Name Uz ; Type AssociatedWith ; NameOfCoef ir ; }
+      }
+      Constraint {
+        { NameOfCoef Uz ;
+          EntityType Region ; NameOfConstraint Voltage_Cir ; }
+        { NameOfCoef Iz ;
+          EntityType Region ; NameOfConstraint Current_Cir ; }
+      }
+    }
+  
+  }
+  
+EndIf // EndIf of CircuitCoupling  
+
 Constraint {
   { Name MVP_3D ;
     Case {
@@ -248,23 +388,30 @@ Constraint {
 
   { Name V_3D ;
     Case {
-      If(_winding_model==STRANDED)
-        { Region Secondary0 ; Type Assign ; Value 0. ; }
-        { Region Secondary1 ; Type Assign ; Value 0. ; }
-      EndIf
+	  If (!_flag_circuit_coupling)
+        If(_winding_model==STRANDED)
+          //{ Region Secondary0 ; Type Assign ; Value 0. ; }
+          //{ Region Secondary1 ; Type Assign ; Value 0. ; }
+		  { Region Primary ; Type Assign ; Value 0. ; }
+        EndIf
+	  EndIf
     }
   }
 
   { Name I_3D ;
     Case {
-      If(_winding_model==MASSIVE)
-        { Region Surf_P_In  ; Type Assign ; Value IA[] ; TimeFunction 1.; }
-        { Region Surf_S0_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
-        { Region Surf_S1_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
-      EndIf
-      If(_winding_model==STRANDED)
-        { Region Primary    ; Type Assign ; Value -IA[] ; TimeFunction 1.; }
-      EndIf
+	  If (!_flag_circuit_coupling)
+        If(_winding_model==MASSIVE)
+          { Region Surf_P_In  ; Type Assign ; Value IA[] ; TimeFunction 1.; }
+          { Region Surf_S0_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
+          { Region Surf_S1_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
+        EndIf
+        If(_winding_model==STRANDED)
+          //{ Region Primary ; Type Assign ; Value -IA[] ; TimeFunction 1.; }
+          { Region Secondary0 ; Type Assign ; Value -IA_sec0 ; TimeFunction 1.; }
+          { Region Secondary1 ; Type Assign ; Value -IA_sec1 ; TimeFunction 1.; }
+        EndIf
+	  EndIf
     }
   }
 
@@ -430,7 +577,7 @@ FunctionSpace {
     BasisFunction {
       { Name sr ; NameOfCoef ir ;  // Global Basis Function
         Function BF_Global { Quantity hs ;
-          Formulation MagSta_hs{NbSrc_DomainB} ;
+          Formulation MagSta_hs {NbSrc_DomainB} ;
           Group DomainB ; Resolution MagSta_hs {NbSrc_DomainB} ; } ;
         Support Domain ; Entity Global [DomainB] ; }
     }
@@ -489,6 +636,11 @@ Formulation {
       { Name Ub ; Type Global ; NameOfSpace HsSpace[Ub] ; }
 
       { Name xis ; Type Local ; NameOfSpace H_xi_divj0 ; } // div j=0
+	  
+	  If (_flag_circuit_coupling)
+        { Name Uz ; Type Global ; NameOfSpace Hregion_Z [Uz] ; }  //For the lumped components and voltage
+        { Name Iz ; Type Global ; NameOfSpace Hregion_Z [Iz] ; }  //For the lumped components and current 	  
+      EndIf
     }
 
     Equation {
@@ -505,10 +657,12 @@ Formulation {
       Galerkin { [ sigma[] * Dof{d v}/SymmetryFactor , {d v} ] ;
         In DomainC ; Jacobian Vol ; Integration II ; }
       GlobalTerm { [ Dof{I}*SymmetryFactor, {U} ] ; In Surf_Elec ; }
-
-      Galerkin { [ -js0[], {a} ] ;
-        In DomainS ; Jacobian Vol ; Integration II ; }
-
+	  
+	  If(!_flag_circuit_coupling)
+		Galerkin { [ -js0[], {a} ] ;
+          In DomainS ; Jacobian Vol ; Integration II ; }
+	  EndIf
+	  
       If(_divJ_zero == DIVJ0_WEAK)
         Galerkin { [ {d xis}, {a} ] ;
           In Domain ; Jacobian Vol ; Integration II ; }
@@ -523,7 +677,27 @@ Formulation {
           In DomainB; Jacobian Vol ; Integration II ; }
         GlobalTerm { [ Dof{Ub}/SymmetryFactor , {Ib} ] ; In DomainB ; }
       EndIf
-    }
+    
+	  If(_flag_circuit_coupling)
+	    GlobalTerm { NeverDt[ Dof{Uz}  , {Iz} ] ; In Resistance_Cir ; }
+	    GlobalTerm { NeverDt[ Resistance[] * Dof{Iz} , {Iz} ] ; In Resistance_Cir ; } // Zskin considered here
+
+	    // GlobalTerm { [ Dof{Uz}                      , {Iz} ] ; In Inductance_Cir ; }
+	    // GlobalTerm { DtDof [ Inductance[] * Dof{Iz} , {Iz} ] ; In Inductance_Cir ; }
+		GlobalTerm { [ 0. * Dof{Iz} , {Iz} ] ; In DomainZt_Cir ; }
+		GlobalTerm { [ 0. * Dof{Uz} , {Iz} ] ; In DomainZt_Cir ; }
+	  
+		// imposing the Kirchhoff nodal equations (sum of currents in each node = 0)
+		// and the Kirchhoff loop equations (sum of voltages in each loop = 0)
+		GlobalEquation {
+		  Type Network ; NameOfConstraint ElectricalCircuit ;
+		  { Node {Ib};  Loop {Ub};  Equation {Ub};  In DomainB; } // for coils domain
+		  //{ Node {I};  Loop {U};  Equation {I};  In DomainC_Mag ; } // for massive conductors domain
+		  { Node {Iz}; Loop {Uz}; Equation {Uz}; In DomainZt_Cir ; }
+	}
+    EndIf
+		
+	}
   }
 
 }
@@ -537,7 +711,7 @@ Resolution {
           { Name Sys_DivJ0 ; NameOfFormulation DivJ0 ; }
         EndIf
         { Name Sys ; NameOfFormulation MagStaDyn_av_js0_3D ; } // static
-       Else
+      Else
         If(_divJ_zero == DIVJ0_WEAK)
           { Name Sys_DivJ0 ; NameOfFormulation DivJ0 ; Type ComplexValue ; Frequency Freq ;}
         EndIf
@@ -553,7 +727,7 @@ Resolution {
       InitSolution[Sys];
       Generate[Sys] ; Solve[Sys] ; SaveSolution[Sys];
       PostOperation[Get_LocalFields] ;
-    //PostOperation[Get_GlobalQuantities] ;
+      PostOperation[Get_GlobalQuantities] ;
     }
   }
 }
@@ -578,13 +752,31 @@ PostProcessing {
       { Name dxis; Value { Term { [ {d xis} ] ; In Domain ; Jacobian Vol ; } } }
       { Name js0_dxis; Value { Term { [ js0[]-{d xis} ] ; In Domain ; Jacobian Vol ; } } }
 
-
+		
       { Name JouleLosses ;
         Value {
+		If (_analysis_type == MASSIVE)
           Integral {[ SymmetryFactor * sigma[]*SquNorm[Dt[{a}]+{d v}] ] ;
             In DomainC ; Jacobian Vol ; Integration II ; }
-          Integral {[ SymmetryFactor * SquNorm[ js0[] ]/sigma[] ] ;
-            In DomainS ; Jacobian Vol ; Integration II ; }
+		EndIf
+		If (_analysis_type == STRANDED)
+			
+		  If (_divJ_zero == DIVJ0_NONE)
+            Integral {[ SymmetryFactor * SquNorm[ js0[] ]/sigma[] ] ;
+            In Domain ; Jacobian Vol ; Integration II ; }
+	      EndIf
+		  
+		  If (_divJ_zero == DIVJ0_WEAK)
+            Integral {[ SymmetryFactor * SquNorm[ (js0[]-{d xis}) ]/sigma[] ] ;
+            In Domain ; Jacobian Vol ; Integration II ; }
+	      EndIf
+		  
+		  If (_divJ_zero == DIVJ0_STRONG)
+            Integral {[ SymmetryFactor * SquNorm[ {d hs} ]/sigma[] ] ;
+            In Domain ; Jacobian Vol ; Integration II ; }
+	      EndIf
+		  
+		EndIf
         }
       }
 
@@ -608,7 +800,21 @@ PostProcessing {
           }
         }
       }
-
+  If (_flag_circuit_coupling)
+	  { Name U ; Value {
+          Term { [ {U} ]   ; In DomainC ; }
+          Term { [ {Ub} ]   ; In DomainB ; }
+          Term { [ {Uz} ]  ; In DomainZt_Cir ; }
+        } 
+	  }
+      { Name I ; Value {
+          Term { [ {I} ]   ; In DomainC ; }
+          Term { [ {Ib} ]   ; In DomainB ; }
+          Term { [ {Iz} ]  ; In DomainZt_Cir ; }
+        } 
+	  }
+  EndIf  
+	  
       // Not a good idea to use the functions...
       { Name Inductance_from_Flux ; Value { Term { Type Global; [ $Flux * 1e3/IA_pri ] ; In DomainDummy ; } } }
       { Name Inductance_from_MagEnergy ; Value { Term { Type Global; [ 2 * $MagEnergy * 1e3/(IA_pri*IA_pri) ] ; In DomainDummy ; } } }
@@ -619,8 +825,8 @@ PostProcessing {
 
 //========================================================================================
 
- PostOperation Get_LocalFields UsingPost MagStaDyn_av_js0_3D {
-   Print[ a,  OnElementsOf Domain,  File StrCat[Dir, "a", ExtGmsh], LastTimeStepOnly ] ;
+PostOperation Get_LocalFields UsingPost MagStaDyn_av_js0_3D {
+  Print[ a,  OnElementsOf Domain,  File StrCat[Dir, "a", ExtGmsh], LastTimeStepOnly ] ;
    If(_winding_model==STRANDED && _divJ_zero==DIVJ0_NONE)
      Print[ js0, OnElementsOf DomainS, File StrCat[Dir, "js0", ExtGmsh], LastTimeStepOnly ] ;
    EndIf
@@ -636,34 +842,44 @@ PostProcessing {
    If(_winding_model==MASSIVE)
      Print[ j, OnElementsOf DomainC,  File StrCat[Dir, "j", ExtGmsh], LastTimeStepOnly ] ;
    EndIf
-   Print[ b,  OnElementsOf Domain,  File StrCat[Dir, "b",ExtGmsh], LastTimeStepOnly ] ;
+  Print[ b,  OnElementsOf Domain,  File StrCat[Dir, "b",ExtGmsh], LastTimeStepOnly ] ;
  }
 
-  PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
-    Print[ Flux[DomainS], OnGlobal, Format TimeTable,
+PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
+  Print[ Flux[DomainS], OnGlobal, Format TimeTable,
      File > StrCat[Dir,"Flux",ExtGnuplot], LastTimeStepOnly, StoreInVariable $Flux,
      SendToServer StrCat[po,"40Flux [Wb]"],  Color "LightYellow" ];
 
-   Print[ Inductance_from_Flux, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
+  Print[ Inductance_from_Flux, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
      File StrCat[Dir,"InductanceF",ExtGnuplot],
      SendToServer StrCat[po,"50Inductance from Flux [mH]"], Color "LightYellow" ];
 
-   Print[ MagEnergy[Domain], OnGlobal, Format TimeTable,
+  Print[ MagEnergy[Domain], OnGlobal, Format TimeTable,
      File > StrCat[Dir,"ME",ExtGnuplot], LastTimeStepOnly, StoreInVariable $MagEnergy,
      SendToServer StrCat[po,"41Magnetic Energy [W]"],  Color "LightYellow" ];
 
-   Print[ Inductance_from_MagEnergy, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
+  Print[ Inductance_from_MagEnergy, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
      File StrCat[Dir,"InductanceE",ExtGnuplot],
      SendToServer StrCat[po,"51Inductance from Magnetic Energy [mH]"], Color "LightYellow" ];
 
-   Print[ JouleLosses[Primary], OnGlobal, Format TimeTable,
+  Print[ JouleLosses[Secondary], OnGlobal, Format TimeTable,
      File > StrCat[Dir,"WindingLoss",ExtGnuplot], LastTimeStepOnly, StoreInVariable $JouleLosses,
      SendToServer StrCat[po,"61Joule loss [W]"],  Color "LightYellow" ];
 
-   Print[ Resistance, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
+  Print[ Resistance, OnRegion DomainDummy, Format Table, LastTimeStepOnly,
      File StrCat[Dir,"ResistanceJ",ExtGnuplot],
      SendToServer StrCat[po,"71Winding resistance [Ohm]"], Color "LightYellow" ];
 
+  If (_flag_circuit_coupling)
+    Print[ I, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+      SendToServer StrCat[po,"I pri [A]"]{0}, Color "LightYellow"];
+    Print[ U, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+      SendToServer StrCat[po,"V pri [V]"]{0}, Color "LightYellow"];
+    Print[ I, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+      SendToServer StrCat[po,"I sec [A]"]{0}, Color "LightYellow"];
+    Print[ U, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+      SendToServer StrCat[po,"V sec [V]"]{0}, Color "LightYellow"];	  
+  EndIf
 }
 
 DefineConstant[
