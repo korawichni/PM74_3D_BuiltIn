@@ -10,23 +10,24 @@ General.ExpertMode = 1;
 _use_recombine=0;// 1 not possible with the current meshing algorithms
 
 // Mesh control parameters
-lc_wind = 1*rs; //2 1.5
-lc_core = 2*lc_wind;
+md = 1.5;
+lc_wind = md*rs; //2 1.5
+lc_core = 2*lc_wind; //2
 lc_inf  = 4*lc_core;
 lc_ag = ag/4;
 
 // Extrusion parameters
 v_extrude = { -(h-ag)/2, -ag, -(h-ag)/2, -(ho-h)/2 };
-nn_side = 6;
-nn_cen = 4; // layer of the extrusion of the central middle part
+nn_side = 6 ; //6 20
+nn_cen_leg = 4 ; // layer of the extrusion of the central middle part
 nn_ag = 4; // layer of the airgap
 nn_thick = 4; // layer of the base
-nn_cen = { nn_thick, nn_ag, nn_cen, nn_thick };
+nn_cen = { nn_cen_leg, nn_ag, nn_cen_leg, nn_thick }; //{ nn_thick, nn_ag, nn_cen_leg, nn_thick };
 
 // Layer of extruded wire
-layer_pri = 40;
-layer_sec0 = 40;
-layer_sec1 = 40;
+layer_pri = 40; //40
+layer_sec0 = 40; //40
+layer_sec1 = 40; //40
 
 If (1)
 

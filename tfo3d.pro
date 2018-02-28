@@ -1,5 +1,6 @@
 Include "tfo3d_data.geo";
 
+
 // gmsh tfo3d.pro -open tfo3d_builtin.geo
 
 Dir="res/";
@@ -17,13 +18,18 @@ DIVJ0_STRONG = 2; // => to add, implementation phase
 STA=0;
 DYN=1;
 
-simp = Str["Simulation param./"];
+simp = Str["Simulation parameters./"];
+simlw = Str["Litz wire parameters./"];
 
 DefineConstant[
   _winding_model = {0, Choices{0="stranded",1="massive"},
     Name StrCat[simp,"00Winding model"], Highlight "Blue"}
+
+  _flag_litz = {_winding_model==MASSIVE ? 0 : 1, Choices{0,1}, Name StrCat[simp,"00litz wire"], ReadOnly _winding_model}	
 	
-  _analysis_type = {_winding_model==MASSIVE ? DYN : STA , Choices{0="magnetostatics",1="magnetodynamic"},
+  //Fill = {AreaCond/AreaCell, Name StrCat[ mgeo,"30Fill factor"], ReadOnly 1, Highlight "Blue"}
+  
+  _analysis_type = {_winding_model==MASSIVE ? DYN : DYN , Choices{0="magnetostatics",1="magnetodynamic"},
     Name StrCat[simp,"00Choose analysis type"], Highlight "Blue", ReadOnly (_winding_model==MASSIVE)}
 
   _divJ_zero = { DIVJ0_STRONG,
@@ -36,9 +42,28 @@ DefineConstant[
       "Strong: Use Hcurl source field hs with curl hs = j, for div j = 0;"],
     Highlight "Blue",  Visible (_winding_model==STRANDED)}
 	
-  _flag_circuit_coupling = {1, Choices{0,1}, Name StrCat[simp,"02Circuit Coupling"]}
+  _flag_circuit_coupling = {0, Choices{0,1}, Name StrCat[simp,"02Circuit Coupling"]}
   
 ];
+
+If (_flag_litz)
+  DefineConstant[
+	strand_dia_pri = { strand_dia_pri_00, Name StrCat[simlw, "/05Strand diameter (primary) [m]" ], Highlight "LightGreen", ReadOnly 1, Closed !_flag_litz }
+	strand_number_pri = { strand_number_pri_00, Name StrCat[simlw, "/06Number of strands in a  primary bundle" ], Highlight "LightGreen", ReadOnly 1, Visible _flag_litz } 
+	strand_dia_sec = { strand_dia_sec_00, Name StrCat[simlw, "/07Strand diameter (secondary) [m]" ], Highlight "LightGreen", ReadOnly 1, Visible _flag_litz } 	
+	strand_number_sec = { strand_number_sec_00, Name StrCat[simlw, "/08Number of strands in a secondary bundle" ], Highlight "LightGreen", ReadOnly 1, Visible _flag_litz }
+    fill_pri = { strand_number_pri*(strand_dia_pri/(2*rp))^2, Name StrCat[simlw,"/12Primary fill factor"], Visible _flag_litz, ReadOnly 1, Highlight "LightGreen"}
+	fill_sec = { strand_number_sec*(strand_dia_sec/(2*rs))^2, Name StrCat[simlw,"/13Secondary fill factor"], Visible _flag_litz, ReadOnly 1, Highlight "LightGreen"}
+  ];
+  
+  
+  
+  FileRP = Sprintf("coeff/SkinProxFactors_RH_la%.2g.pro", fill_pri);//Sprintf("Coeffs_RH_la%.2g.pro", lambda_pri); "SkinProxFactors_RH_la%.2g_meeker.pro"
+  FileRS = Sprintf("coeff/SkinProxFactors_RH_la%.2g.pro", fill_sec);
+  Include FileRP;
+  Include FileRS;
+EndIf
+
 
 Group{
 
@@ -66,6 +91,7 @@ Group{
   Cut_Primary    = #{1002101};
   Cut_Secondary0 = #{1002102};
   Cut_Secondary1 = #{1002103};
+ 
 
   Surf_In  = Region[{Surf_P_In,  Surf_S0_In,  Surf_S1_In}];
   Surf_Out = Region[{Surf_P_Out, Surf_S0_Out, Surf_S1_Out}];
@@ -139,8 +165,8 @@ Group{
 
 Function{
   // RMS current
-  Irms1 = 10.;
-  Irms2 = 0.;
+  Irms1 = 0;
+  Irms2 = 10;
 
   // To be adapted
   Nw_pri  = 1.;
@@ -172,15 +198,17 @@ Function{
   IA_pri  = Irms_pri * Sqrt[2];
   IA_sec0 = Irms_sec * Sqrt[2];
   IA_sec1 = Irms_sec * Sqrt[2];
-  IA[#{Primary, Surf_P_In}]     = IA_pri;
+
+  IA[#{Primary, Surf_P_In}]     = IA_pri ; 
   IA[#{Secondary0, Surf_S0_In}] = IA_sec0;
   IA[#{Secondary1, Surf_S1_In}] = IA_sec1;
+  
 
   IA[#{Air,Core}] = IA_pri*0;
 
-  Ap = (interwire_pri+2*(rp+thick_insul))/4;
-  As = (interwire_sec+2*(rs+thick_insul))/4;
-
+  Ap = (interwire_pri+2*(rp+thick_insul))/4 ;
+  As = (interwire_sec+2*(rs+thick_insul))/4 ;
+/*
   Np_=Np-0.25*0;
   vDir[#{Primary}] =
   (Y[] >= yp0-rp && Z[] >=0 && X[]>0) ? Vector [0.,0.,-1.] :
@@ -191,24 +219,82 @@ Function{
   vDir[#{Secondary0,Secondary1}] =
   ( (Y[] >= ys0-rs && Z[] >=0 && X[]>0) ? Vector [0.,0.,-1.]:
     (Y[] <= ys0+2*rs-(interwire_sec+2*(rs+thick_insul))*Ns_ && Z[]>=0 && X[] >=0) ? Vector [1.,0.,0.]:
-    Unit [ Vector [ Z[], -As ,-X[] ] ] );
+    Unit [ Vector [ Z[], -As ,-X[] ] ] ); */
+  //================================================
+  /* Parameters w and a depending on how to construct the winding
+         x(t) = R*cos(wt), w = Pi/2
+         y(t) = H - at,    a = pitch/4
+	     z(t) = -R*sin(wt)
+  The tangent vector of r(t) = {x(t),y(t),z(t)} is r'(t) = {w*z(t), -a, -w*x(t)} being normalized 
+  *///===============================================
 
+  
+  eps = 1e-3*1;
+  _tmp_omega = Pi/2;
+  //pitch_pri = (interwire_pri+2*(rp+thick_insul))
+  _tmp_pri = yp0+rp-(interwire_pri+2*(rp+thick_insul))*(Np-0.25) + eps;  
+  _tmp_sec = ys0+rs-(interwire_sec+2*(rs+thick_insul))*(Ns-0.25) + eps; // this value is -14.195 mm in raw value.
+
+  vDir[Primary] = ( (Y[] >= yp0-rp && Z[] >=0 && X[] >=0 ) ? Vector [0,0,-1]: 
+                  ( Y[]<= _tmp_pri  && X[] >=0 && Z[] >=0) ? Vector [1,0,0]: 
+                    Unit [ Vector [ _tmp_omega*Z[], -Ap ,-_tmp_omega*X[] ] ] );
+  vDir[#{Secondary0,Secondary1}] = ( (Y[] >= ys0-rs && Z[] >=0 && X[] >=0 ) ? Vector [0,0,-1]:
+                    ( Y[]<=  _tmp_sec && X[] >=0 && Z[] >=0) ? Vector [1,0,0]:
+                      Unit [ Vector [ _tmp_omega*Z[], -As ,-_tmp_omega*X[] ] ] );
+	
+	
   SurfCoil[Primary]    = SurfaceArea[]{IN_PRI};
   SurfCoil[Secondary0] = SurfaceArea[]{IN_SEC0};
   SurfCoil[Secondary1] = SurfaceArea[]{IN_SEC1};
 
   js1A[] = NbWires[]/SurfCoil[]*vDir[];
-  js0[]  = IA[]*js1A[];
+  js0[]  = IA[]*js1A[] ;
 
   // Material properties
   mu0 = 4.e-7 * Pi ;
-
-  nu[ Region[{Air, Winding}] ] = 1./mu0 ;
+  nu0 = 1./mu0;  
+  nu[ Region[{Air}]] = nu0;
   nu[Core] = 1/(mur_fe*mu0) ;
 
   sigma[Winding] = sigma_coil ;
   rho[] = 1/sigma[] ;
+
+  Rdc_pri =  Hypot[2*Pi*x0,pitch_pri]
+  // Homogenization coefficients: round conductor & hexagonal packing 
+  If (_flag_litz)
+    DefineConstant[
+      delta = {Sqrt[1/(Pi*Freq*mu0*sigma_coil)] , Name StrCat[simlw,"/20Skin depth (m)"], Visible (_analysis_type==DYN) , Highlight "LightGreen", ReadOnly 1 }	
+      X_pri = { strand_dia_pri*1/2/delta, Name StrCat[simlw,"/21Reduced frequncy ratio, Xpri"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}
+      X_sec = { strand_dia_sec*1/2/delta, Name StrCat[simlw,"/22Reduced frequncy ratio, Xsec"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}
+    ];
+    
+	// Frequency domain
+    skin_rhor[Primary] = InterpolationLinear[$1]{List[skin_rhor_Circ_pri]} ;
+    skin_rhoi[Primary] = InterpolationLinear[$1]{List[skin_rhor_Circ_pri]} ;
+    prox_nur[Primary]  = InterpolationLinear[$1]{List[prox_nur_Circ_pri]} ;
+    prox_nui[Primary]  = InterpolationLinear[$1]{List[prox_nui_Circ_pri]} ;
+
+    skin_rhor[Secondary] = InterpolationLinear[$1]{List[skin_rhor_Circ_sec]} ;
+    skin_rhoi[Secondary] = InterpolationLinear[$1]{List[skin_rhor_Circ_sec]} ;
+    prox_nur[Secondary]  = InterpolationLinear[$1]{List[prox_nur_Circ_sec]} ;
+    prox_nui[Secondary]  = InterpolationLinear[$1]{List[prox_nui_Circ_sec]} ;
+
+    nu [Primary] = nu0*Complex[ prox_nur[X_pri], prox_nui[X_pri]*fill_pri*X_pri^2/2];//* Complex[qb_pri,pb_pri*lambda_pri*x_pri^2/2];
+    nu [Secondary] = nu0*Complex[ prox_nur[X_sec], prox_nui[X_sec]*fill_sec*X_sec^2/2];//*
+	
+	//zskin_pri = Rdc_pri*Complex[skin_rhor[X_pri],skin_rhoi[X_pri]*x_pri^2/4/fill_pri];
+	//zskin_sec = Rdc_sec*Complex[skin_rhor[X_sec],skin_rhoi[X_sec]*x_sec^2/4/fill_sec];
+
+Else 
+   nu[ Region[{Winding}]] = nu0;
+EndIf
+ 
+
 }
+
+
+
+
 
 
 Jacobian {
@@ -253,10 +339,10 @@ If (_flag_circuit_coupling)
 	
     VI_source_sec = # 2000004 ;
     Rs_sec  = # 2000005 ;
-	//Rz_sec = # 2000006 ;
+	Rz_sec = # 2000006 ;
 	
     //Resistance_Cir  = Region[ {Rs_pri,Rz_pri,Rs_sec,Rz_pri} ] ;
-    Resistance_Cir  = Region[ {Rs_pri,Rs_sec} ] ;
+    Resistance_Cir  = Region[ {Rs_pri,Rs_sec,Rz_sec} ] ;
     Inductance_Cir  = Region[ {} ] ;
 
     Capacitance1_Cir = Region[ {} ] ;
@@ -283,7 +369,7 @@ If (_flag_circuit_coupling)
 	// EndIf
 	// If (Flag_Ic)
 	  Resistance[#{Rs_pri,Rs_sec}] = 1e50;
-  	  //Resistance[#{Rz_pri,Rz_sec}] = 1;
+  	  Resistance[#{Rz_sec}] = 0*Complex[0.5,0.5];
 	//EndIf
   }
   
@@ -343,13 +429,13 @@ If (_flag_circuit_coupling)
 	
       Case Circuit2 {
 		If (Ns > 0)
-		  { Region Secondary0 ; Branch {1, 2} ; }
-		  { Region Secondary1 ; Branch {3, 2} ; }
+		  { Region Secondary0 ; Branch {2, 3} ; }
+		  { Region Secondary1 ; Branch {3, 4} ; }
 		EndIf
 		
-		//{ Region Rz_sec ; Branch {1, 2} ; }		
-		{ Region VI_source_sec ; Branch {1, 3} ; }
-		{ Region Rs_sec; Branch {1, 3} ; } // Need this to make it well-conditioned
+		{ Region Rz_sec ; Branch {1, 2} ; }		
+		{ Region VI_source_sec ; Branch {1, 4} ; }
+		{ Region Rs_sec; Branch {1, 4} ; } // Need this to make it well-conditioned
 	  }	 
    } 
   } // End of Constraint
@@ -407,9 +493,9 @@ Constraint {
           { Region Surf_S1_In ; Type Assign ; Value IA[] ; TimeFunction 1.; }
         EndIf
         If(_winding_model==STRANDED)
-          //{ Region Primary ; Type Assign ; Value -IA[] ; TimeFunction 1.; }
-          { Region Secondary0 ; Type Assign ; Value -IA_sec0 ; TimeFunction 1.; }
-          { Region Secondary1 ; Type Assign ; Value -IA_sec1 ; TimeFunction 1.; }
+          //{ Region Primary ; Type Assign ; Value -IA[]##333 ; TimeFunction 1.; }
+          { Region Secondary0 ; Type Assign ; Value IA_sec0 ; TimeFunction 1.; } 
+          { Region Secondary1 ; Type Assign ; Value IA_sec1 ; TimeFunction 1.; }
         EndIf
 	  EndIf
     }
@@ -695,7 +781,7 @@ Formulation {
 		  //{ Node {I};  Loop {U};  Equation {I};  In DomainC_Mag ; } // for massive conductors domain
 		  { Node {Iz}; Loop {Uz}; Equation {Uz}; In DomainZt_Cir ; }
 	}
-    EndIf
+      EndIf
 		
 	}
   }
@@ -811,14 +897,48 @@ PostProcessing {
           Term { [ {I} ]   ; In DomainC ; }
           Term { [ {Ib} ]   ; In DomainB ; }
           Term { [ {Iz} ]  ; In DomainZt_Cir ; }
+        }
+	  }
+    If (_analysis_type == DYN)
+		
+	  { Name Upk ; Value {
+          Term { [ Norm[{U}] ]   ; In DomainC ; }
+          Term { [ Norm[{Ub}] ]   ; In DomainB ; }
+          Term { [ Norm[{Uz}] ]  ; In DomainZt_Cir ; }
         } 
 	  }
+	  { Name Uph ; Value {
+          Term { [ 180/Pi*Atan2[Im[{U}],Re[{U}]] ]   ; In DomainC ; }
+          Term { [ 180/Pi*Atan2[Im[{Ub}],Re[{Ub}]] ]   ; In DomainB ; }
+          Term { [ 180/Pi*Atan2[Im[{Uz}],Re[{Uz}]] ]  ; In DomainZt_Cir ; }
+        } 
+	  }
+		
+	  { Name Ipk ; Value {
+          Term { [ Norm[{I}] ]   ; In DomainC ; }
+          Term { [ Norm[{Ib}] ]   ; In DomainB ; }
+          Term { [ Norm[{Iz}] ]  ; In DomainZt_Cir ; }
+        } 
+	  }
+	  { Name Iph ; Value {
+          Term { [ 180/Pi*Atan2[Im[{I}],Re[{I}]] ]   ; In DomainC ; }
+          Term { [ 180/Pi*Atan2[Im[{Ib}],Re[{Ib}]] ]   ; In DomainB ; }
+          Term { [ 180/Pi*Atan2[Im[{Iz}],Re[{Iz}]] ]  ; In DomainZt_Cir ; }
+        } 
+	  }
+
+	EndIf  
+	  
+	  
+	  
+	  
+	  
   EndIf  
 	  
       // Not a good idea to use the functions...
-      { Name Inductance_from_Flux ; Value { Term { Type Global; [ $Flux * 1e3/IA_pri ] ; In DomainDummy ; } } }
-      { Name Inductance_from_MagEnergy ; Value { Term { Type Global; [ 2 * $MagEnergy * 1e3/(IA_pri*IA_pri) ] ; In DomainDummy ; } } }
-      { Name Resistance ; Value { Term { Type Global; [ 2 * $JouleLosses /(IA_pri*IA_pri) ] ; In DomainDummy ; } } }
+      { Name Inductance_from_Flux ; Value { Term { Type Global; [ $Flux * 1e3/IA_sec0] ; In DomainDummy ; } } }
+      { Name Inductance_from_MagEnergy ; Value { Term { Type Global; [ 2 * $MagEnergy * 1e3/(IA_sec0*IA_sec0) ] ; In DomainDummy ; } } }
+      { Name Resistance ; Value { Term { Type Global; [ 2 * $JouleLosses /(IA_sec0*IA_sec0) ] ; In DomainDummy ; } } }
     }
   }
 }
@@ -871,14 +991,37 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
      SendToServer StrCat[po,"71Winding resistance [Ohm]"], Color "LightYellow" ];
 
   If (_flag_circuit_coupling)
-    Print[ I, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
-      SendToServer StrCat[po,"I pri [A]"]{0}, Color "LightYellow"];
-    Print[ U, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
-      SendToServer StrCat[po,"V pri [V]"]{0}, Color "LightYellow"];
-    Print[ I, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
-      SendToServer StrCat[po,"I sec [A]"]{0}, Color "LightYellow"];
-    Print[ U, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
-      SendToServer StrCat[po,"V sec [V]"]{0}, Color "LightYellow"];	  
+	If (_analysis_type == STA)
+      Print[ I, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+        SendToServer StrCat[po,"I pri [A]"]{0}, Color "LightYellow"];
+      Print[ U, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+        SendToServer StrCat[po,"V pri [V]"]{0}, Color "LightYellow"];
+      Print[ I, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+        SendToServer StrCat[po,"I sec [A]"]{0}, Color "LightYellow"];
+      Print[ U, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+        SendToServer StrCat[po,"V sec [V]"]{0}, Color "LightYellow"];	  
+	EndIf
+	
+    If (_analysis_type == DYN)
+      Print[ Ipk, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"CurrentPriPk",ExtGnuplot],
+        SendToServer StrCat[po,"Ipk pri [A]"]{0}, Color "LightYellow"];
+      Print[ Iph, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"CurrentPriPh",ExtGnuplot],
+        SendToServer StrCat[po,"Phase I pri [degree]"]{0}, Color "LightYellow"];
+      Print[ Upk, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"VoltagePriPk",ExtGnuplot],
+        SendToServer StrCat[po,"Vpk pri [V]"]{0}, Color "LightYellow"];
+      Print[ Uph, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"VoltagePriPh",ExtGnuplot],
+        SendToServer StrCat[po,"Phase V pri [degree]"]{0}, Color "LightYellow"];	 
+		
+      Print[ Ipk, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"CurrentSecPk",ExtGnuplot],
+        SendToServer StrCat[po,"Ipk sec [A]"]{0}, Color "LightYellow"];
+      Print[ Iph, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"CurrentSecPh",ExtGnuplot],
+        SendToServer StrCat[po,"Phase I sec [degree]"]{0}, Color "LightYellow"];
+      Print[ Upk, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPk",ExtGnuplot],
+        SendToServer StrCat[po,"Vpk sec [V]"]{0}, Color "LightYellow"];
+      Print[ Uph, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPh",ExtGnuplot],
+        SendToServer StrCat[po,"Phase V sec [degree]"]{0}, Color "LightYellow"];	 		
+	EndIf	
+		
   EndIf
 }
 
