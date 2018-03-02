@@ -284,9 +284,11 @@ Function{
   // Homogenization coefficients: round conductor & hexagonal packing 
   If (_flag_litz)
     DefineConstant[
-      delta = {Sqrt[1/(Pi*Freq*mu0*sigma_coil)] , Name StrCat[simlw,"/20Skin depth (m)"], /* Visible (_analysis_type==DYN) ,*/ Highlight "LightGreen", ReadOnly 1 }	
-      X_pri = { strand_dia_pri*1/2/delta, Name StrCat[simlw,"/21Reduced frequncy ratio, Xpri"], /* Visible (_analysis_type==DYN) ,*/ ReadOnly 1, Highlight "LightGreen"}
-      X_sec = { strand_dia_sec*1/2/delta, Name StrCat[simlw,"/22Reduced frequncy ratio, Xsec"], /* Visible (_analysis_type==DYN) ,*/ ReadOnly 1, Highlight "LightGreen"}
+      delta = {Sqrt[1/(Pi*Freq*mu0*sigma_coil)] , Name StrCat[simlw,"/20Skin depth (m)"], Visible (_analysis_type==DYN) ,Highlight "LightGreen", ReadOnly 1 }	
+      X_pri = { strand_dia_pri*1/2/delta, Name StrCat[simlw,"/21Reduced frequncy ratio, Xpri"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}
+      X_sec = { strand_dia_sec*1/2/delta, Name StrCat[simlw,"/22Reduced frequncy ratio, Xsec"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}
+      _Rdc_pri = { Rdc_pri, Name StrCat[simlw,"/23DC resistance (pri) [Ohm]"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}	  
+      _Rdc_sec = { Rdc_sec, Name StrCat[simlw,"/23DC resistance (sec) [Ohm]"], Visible (_analysis_type==DYN), ReadOnly 1, Highlight "LightGreen"}	  
     ];
     
 	// Frequency domain
@@ -983,7 +985,7 @@ PostProcessing {
 			
 	  { Name Lac ;
       Value {
-	  Term { Type Global; [ -Im[{Uz}/{Iz}]/(2*Pi*Freq) ] ; In DomainZt_Cir ;  } } }		  
+	  Term { Type Global; [ Im[{Uz}/{Iz}]/(2*Pi*Freq) ] ; In DomainZt_Cir ;  } } }		  
 
 	EndIf  
 
@@ -1070,6 +1072,16 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
   EndIf
   
   If (_flag_circuit_coupling)
+	If (IA_pri != 0)
+      Print[ Rac, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Rac_pri",ExtGnuplot],
+        SendToServer StrCat[pcp,"4Rac_pri [Ohm]"]{0}, Color "LightYellow"];
+	EndIf		
+
+	If (IA_sec0 != 0 && IA_sec1 != 0)	
+      Print[ Rac, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Rac_sec",ExtGnuplot],
+        SendToServer StrCat[pcs,"4Rac_sec [Ohm]"]{0}, Color "LightYellow"];
+	EndIf	  
+	  
 	If (_analysis_type == STA)
       Print[ I, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
         SendToServer StrCat[po,"I pri [A]"]{0}, Color "LightYellow"];
@@ -1080,15 +1092,7 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
       Print[ U, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
         SendToServer StrCat[po,"V sec [V]"]{0}, Color "LightYellow"];
 
-      If (IA_pri != 0)
-        Print[ Rac, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Rac_pri",ExtGnuplot],
-          SendToServer StrCat[pcp,"4Rac_pri [Ohm]"]{0}, Color "LightYellow"];
-	  EndIf		
 
-	  If (IA_sec0 != 0 && IA_sec1 != 0)	
-        Print[ Rac, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Rac_sec",ExtGnuplot],
-          SendToServer StrCat[pcs,"4Rac_sec [Ohm]"]{0}, Color "LightYellow"];
-	  EndIf	  
 		
 	EndIf
 	
@@ -1111,7 +1115,7 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
         SendToServer StrCat[pcs,"0Ipk sec [A]"]{0}, Color "LightYellow"];
       Print[ Iph, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"CurrentSecPh",ExtGnuplot],
         SendToServer StrCat[pcs,"1Phase I sec [degree]"]{0}, Color "LightYellow"];
-      Print[ Upk, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"VoltageSecPk",ExtGnuplot],
+      Print[ Upk, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPk",ExtGnuplot],
         SendToServer StrCat[pcs,"2Vpk sec [V]"]{0}, Color "LightYellow"];
       Print[ Uph, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPh",ExtGnuplot],
         SendToServer StrCat[pcs,"3Phase V sec [degree]"]{0}, Color "LightYellow"];
