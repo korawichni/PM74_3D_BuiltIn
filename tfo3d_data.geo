@@ -2,7 +2,8 @@ ppw = "2Model parameters/3Wire parameters" ;
 
 
 thick_insul00 = 5e-5;
-Np = 4; Ns = 6;
+Np = 7; //4
+Ns = 6;
 
 mm=1e-3;
 ro  = (74-2.5)/2*mm; // outer-most radius
@@ -22,7 +23,8 @@ rot_angle = Pi/2*0 - 0.1 + 1*Atan[ro*Tan[Pi/3]/(ro + ri2)];
 
 
 
-rp00 = 0.0043/2;  interwire_pri = 0.0035;//0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
+rp00 = 0.0043/2;  
+interwire_pri = 0.0035/4;//0.0035, 0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
 rs00 = 0.00252/2; interwire_sec = 0.003; //0.003676; //0.003;//
 strand_dia_pri_00 = 0.2*mm;
 strand_dia_sec_00 = 0.2*mm;

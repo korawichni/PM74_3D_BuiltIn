@@ -1,5 +1,5 @@
 Include "tfo3d_data.geo";
-
+Include "param_init.pro";
 
 // gmsh tfo3d.pro -open tfo3d_builtin.geo
 
@@ -29,11 +29,12 @@ DefineConstant[
   _winding_model = {0, Choices{0="stranded",1="massive"},
     Name StrCat[simp,"00Winding model"], Highlight "Blue"}
 
-  _flag_litz = {_winding_model==MASSIVE ? 0 : 1, Choices{0,1}, Name StrCat[simp,"00litz wire"], ReadOnly _winding_model}	
-	
+  _flag_litz = {_winding_model==MASSIVE ? 0 : 1, Choices{0,1}, Name StrCat[simp,"01litz wire"], ReadOnly _winding_model}
+  
+  _flag_ideal_core = {0, Choices{0,1}, Name StrCat[simp,"01Ideal core"]}		
   //Fill = {AreaCond/AreaCell, Name StrCat[ mgeo,"30Fill factor"], ReadOnly 1, Highlight "Blue"}
   
-  _analysis_type = {_winding_model==MASSIVE ? DYN : STA, Choices{0="magnetostatics",1="magnetodynamic"},
+  _analysis_type = {_winding_model==MASSIVE ? DYN : DYN, Choices{0="magnetostatics",1="magnetodynamic"},
     Name StrCat[simp,"00Choose analysis type"], Highlight "Blue", ReadOnly (_winding_model==MASSIVE)}
 
   _divJ_zero = { DIVJ0_STRONG,
@@ -49,6 +50,10 @@ DefineConstant[
   _flag_circuit_coupling = {1, Choices{0,1}, Name StrCat[simp,"02Circuit Coupling"]}
   
 ];
+
+If (!_flag_ideal_core)
+  Include "mu_N27.pro";
+EndIf
 
 If (_flag_litz)
   DefineConstant[
@@ -95,9 +100,10 @@ Group{
   Surf_S1_Out = #{OUT_SEC1};
 
   // Generated automatically with Homology
-  Cut_Primary    = #{1002102}; // Default: pri-1 sec0-2 sec1-3
-  Cut_Secondary0 = #{1002101};
-  Cut_Secondary1 = #{1002103};
+  // md = 1.5, using pri-2 sec0-1 sec1-3
+  Cut_Primary    = #{1002101}; // Default: pri-1 sec0-2 sec1-3
+  Cut_Secondary0 = #{1002103}; //1
+  Cut_Secondary1 = #{1002102};
  
 
   Surf_In  = Region[{Surf_P_In,  Surf_S0_In,  Surf_S1_In}];
@@ -174,6 +180,7 @@ Function{
   // RMS current
   Irms1 = 0;
   Irms2 = 10;
+  
 
   // To be adapted
   If (_flag_litz)
@@ -187,16 +194,16 @@ Function{
   EndIf
 	
   DefineConstant[
-    Freq = { 50., Min 0, Max 1e3, Step 1,
+    Freq = { Freq_00, Min 0, Max 1e3, Step 1,
       Name StrCat[simp,"10source/00frequency [Hz]"], Highlight "AliceBlue"},
-    Irms_pri = { Irms1, Min 1, Max 4*Irms1, Step 2,
+    Irms_pri = { Irms_pri_00, Min 1, Max 4*Irms1, Step 2,
       Name StrCat[simp,"10source/01primary current (rms) [A]"], Highlight "AliceBlue"}
-    Irms_sec = { Irms2, Min 1, Max 4*Irms2, Step 2,
+    Irms_sec = { Irms_sec_00, Min 1, Max 4*Irms2, Step 2,
       Name StrCat[simp,"10source/02secondary current (rms) [A]"], Highlight "AliceBlue"}
 
     sigma_coil = { sigma_cu,
       Name  StrCat[simp,"10source/10conductivity"], Units "S/m", Highlight "AliceBlue"},
-    mur_fe = { 2000, Min 100, Max 2000, Step 100,
+    mur_fe0 = { 1, Min 100, Max 2000, Step 100,
       Name  StrCat[simp,"11core relative permeability"], Highlight "AliceBlue"}
     //N27 initial permeability = 2000
 
@@ -267,10 +274,34 @@ Function{
   js0[]  = _flag_litz? IA[]/NbWires[]*js1A[] : IA[]*js1A[];
 
   // Material properties
+  
+
+  
   mu0 = 4.e-7 * Pi ;
   nu0 = 1./mu0;  
   nu[ Region[{Air}]] = nu0;
-  nu[Core] = 1/(mur_fe*mu0) ;
+  If (_flag_ideal_core)
+	mur_fe = mur_fe0;
+    nu[Core] = 1/(mur_fe*mu0);
+  Else
+	If (Freq < 1e4) // using freq_tmp to extract the coefficients
+	  freq_tmp = 1.5e4; // Imposing constant low-frequency characteristics
+    Else
+	  freq_tmp = Freq;
+    EndIf
+  
+    mur_real[] = InterpolationLinear[$1]{List[real_mu]} ;
+    mur_imag[] = InterpolationLinear[$1]{List[imag_mu]} ;
+    //mu[Core] = mu0*Complex[ mur_real[Freq*1e-6], mur_imag[Freq*1e-6] ];
+    logfreq = Log[freq_tmp*1e-6];
+    //mur_im[Core] = mur_imag[logfreq];
+	//mur_fe[]= Complex[Exp[mur_real[logfreq]],Exp[mur_imag[logfreq]]]##222;
+	// Complex permeability of the core is u =  u_re - j*u_im
+	nu[Core] = (nu0/Complex[Exp[mur_real[logfreq]],-1*Exp[mur_imag[logfreq]]]);
+	//nu[Core] = nu0/((mur_real[logfreq]#0)^2+(mur_imag[logfreq]#1)^2)*Complex[#0,#1] ;  
+  EndIf
+
+  //nu[Core] = 1/(mur_fe[]*mu0) ##222 ;
 
   sigma[Winding] = sigma_coil ;
   rho[] = 1/sigma[] ;
@@ -544,7 +575,7 @@ Constraint {
     Case {
       { Region SurfCutB~{1}; Value Nw_pri ; }
       { Region SurfCutB~{2}; Value Nw_sec0 ; }
-      { Region SurfCutB~{3}; Value -Nw_sec1 ; }
+      { Region SurfCutB~{3}; Value Nw_sec1 ; }
     }
   }
 
@@ -854,8 +885,8 @@ Resolution {
       EndIf
       InitSolution[Sys];
       Generate[Sys] ; Solve[Sys] ; SaveSolution[Sys];
-      PostOperation[Get_LocalFields] ;
-      PostOperation[Get_GlobalQuantities] ;
+      //PostOperation[Get_LocalFields] ;
+      //PostOperation[Get_GlobalQuantities] ;
     }
   }
 }
@@ -1073,23 +1104,23 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
   
   If (_flag_circuit_coupling)
 	If (IA_pri != 0)
-      Print[ Rac, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Rac_pri",ExtGnuplot],
+      Print[ Rac, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Rac_pri",ExtGnuplot],
         SendToServer StrCat[pcp,"4Rac_pri [Ohm]"]{0}, Color "LightYellow"];
 	EndIf		
 
 	If (IA_sec0 != 0 && IA_sec1 != 0)	
-      Print[ Rac, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Rac_sec",ExtGnuplot],
+      Print[ Rac, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"Rac_sec",ExtGnuplot],
         SendToServer StrCat[pcs,"4Rac_sec [Ohm]"]{0}, Color "LightYellow"];
 	EndIf	  
 	  
 	If (_analysis_type == STA)
-      Print[ I, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+      Print[ I, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Current",ExtGnuplot],
         SendToServer StrCat[po,"I pri [A]"]{0}, Color "LightYellow"];
-      Print[ U, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+      Print[ U, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Voltage",ExtGnuplot],
         SendToServer StrCat[po,"V pri [V]"]{0}, Color "LightYellow"];
-      Print[ I, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"Current",ExtGnuplot],
+      Print[ I, OnRegion Secondary0, Format TimeTable, File > StrCat[Dir,"Current",ExtGnuplot],
         SendToServer StrCat[po,"I sec [A]"]{0}, Color "LightYellow"];
-      Print[ U, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Voltage",ExtGnuplot],
+      Print[ U, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"Voltage",ExtGnuplot],
         SendToServer StrCat[po,"V sec [V]"]{0}, Color "LightYellow"];
 
 
@@ -1097,31 +1128,31 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
 	EndIf
 	
     If (_analysis_type == DYN)
-      Print[ Ipk, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"CurrentPriPk",ExtGnuplot],
+      Print[ Ipk, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"CurrentPriPk",ExtGnuplot],
         SendToServer StrCat[pcp,"0Ipk pri [A]"]{0}, Color "LightYellow"];
-      Print[ Iph, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"CurrentPriPh",ExtGnuplot],
+      Print[ Iph, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"CurrentPriPh",ExtGnuplot],
         SendToServer StrCat[pcp,"1Phase I pri [degree]"]{0}, Color "LightYellow"];
-      Print[ Upk, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"VoltagePriPk",ExtGnuplot],
+      Print[ Upk, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"VoltagePriPk",ExtGnuplot],
         SendToServer StrCat[pcp,"2Vpk pri [V]"]{0}, Color "LightYellow"];
-      Print[ Uph, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"VoltagePriPh",ExtGnuplot],
+      Print[ Uph, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"VoltagePriPh",ExtGnuplot],
         SendToServer StrCat[pcp,"3Phase V pri [degree]"]{0}, Color "LightYellow"];
 		
       If (IA_pri != 0)
-        Print[ Lac, OnRegion VI_source_pri, Format TimeTable, File StrCat[Dir,"Lac_pri",ExtGnuplot],
+        Print[ Lac, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Lac_pri",ExtGnuplot],
           SendToServer StrCat[pcp,"5Lac_pri [H]"]{0}, Color "LightYellow"];		
 	  EndIf
 	  
-      Print[ Ipk, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"CurrentSecPk",ExtGnuplot],
+      Print[ Ipk, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"CurrentSecPk",ExtGnuplot],
         SendToServer StrCat[pcs,"0Ipk sec [A]"]{0}, Color "LightYellow"];
-      Print[ Iph, OnRegion Secondary0, Format TimeTable, File StrCat[Dir,"CurrentSecPh",ExtGnuplot],
+      Print[ Iph, OnRegion Secondary0, Format TimeTable, File > StrCat[Dir,"CurrentSecPh",ExtGnuplot],
         SendToServer StrCat[pcs,"1Phase I sec [degree]"]{0}, Color "LightYellow"];
-      Print[ Upk, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPk",ExtGnuplot],
+      Print[ Upk, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"VoltageSecPk",ExtGnuplot],
         SendToServer StrCat[pcs,"2Vpk sec [V]"]{0}, Color "LightYellow"];
-      Print[ Uph, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"VoltageSecPh",ExtGnuplot],
+      Print[ Uph, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"VoltageSecPh",ExtGnuplot],
         SendToServer StrCat[pcs,"3Phase V sec [degree]"]{0}, Color "LightYellow"];
 
 	  If (IA_sec0 != 0 && IA_sec1 != 0)	
-        Print[ Lac, OnRegion VI_source_sec, Format TimeTable, File StrCat[Dir,"Lac_sec",ExtGnuplot],
+        Print[ Lac, OnRegion VI_source_sec, Format TimeTable, File > StrCat[Dir,"Lac_sec",ExtGnuplot],
           SendToServer StrCat[pcs,"5Lac_sec [H]"]{0}, Color "LightYellow"];
 	  EndIf
 		
