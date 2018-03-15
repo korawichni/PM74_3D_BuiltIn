@@ -24,7 +24,7 @@ rot_angle = Pi/2*0 - 0.1 + 1*Atan[ro*Tan[Pi/3]/(ro + ri2)];
 
 
 rp00 = 0.0043/2;  
-interwire_pri = 0.0035/4;//0.0035, 0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
+
 rs00 = 0.00252/2; interwire_sec = 0.003; //0.003676; //0.003;//
 strand_dia_pri_00 = 0.2*mm;
 strand_dia_sec_00 = 0.2*mm;
@@ -36,7 +36,17 @@ lb = z0; // length of the box
 hb = 2*ho; // height of the box
 
 // initial coordinate of the center of the coil in XY plane, where Y is height
-xp0 = 0.022775; yp0 = 0.0148+0.001; zp0 = z0;
+//============= For 4:12 configuration ===============//
+// interwire_pri = 0.0035;//0.0035, 0.005065; // 0.003;// modified because the cross section shows 5 circles instead of 4 circles
+// interwire_sec = 0.003; //0.003676; //0.003;//
+// xp0 = 0.022775; yp0 = 0.0148+0.001; zp0 = z0;
+// xs0 = 0.01781; ys0 = 0.01686; zs0 = z0;
+// xs1 = 0.02774; ys1 = 0.01686; zs1 = z0;
+
+//============== For 7:6 configuration ===============//
+interwire_pri = 0.0035/4;//0.0035, 0.005065;
+interwire_sec = 0.003 + 0.0005; //0.003676; //0.003;//
+xp0 = 0.022775; yp0 = 0.0156+0.002; zp0 = z0;
 xs0 = 0.01781; ys0 = 0.01686; zs0 = z0;
 xs1 = 0.02774; ys1 = 0.01686; zs1 = z0;
 

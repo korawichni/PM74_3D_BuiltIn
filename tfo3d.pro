@@ -101,9 +101,10 @@ Group{
 
   // Generated automatically with Homology
   // md = 1.5, using pri-2 sec0-1 sec1-3
-  Cut_Primary    = #{1002101}; // Default: pri-1 sec0-2 sec1-3
-  Cut_Secondary0 = #{1002103}; //1
-  Cut_Secondary1 = #{1002102};
+  // withe 07.msh file using pri-1 sec0-3 sec1-2
+  Cut_Primary    = #{1002102}; // Default: pri-1 sec0-2 sec1-3
+  Cut_Secondary0 = #{1002101}; //1
+  Cut_Secondary1 = #{1002103};
  
 
   Surf_In  = Region[{Surf_P_In,  Surf_S0_In,  Surf_S1_In}];
@@ -257,13 +258,15 @@ Function{
   _tmp_pri = yp0+rp-pitch_pri*(Np-0.25) + eps;  
   _tmp_sec = ys0+rs-pitch_sec*(Ns-0.25) + eps; // this value is -14.195 mm in raw value.
 
-  vDir[Primary] = ( (Y[] >= yp0-rp && Z[] >=0 && X[] >=0 ) ? Vector [0,0,-1]: 
-                  ( Y[]<= _tmp_pri  && X[] >=0 && Z[] >=0) ? Vector [1,0,0]: 
+  vDir[Primary] = ( (Y[] >= yp0-rp && Z[] >=0 && X[] >=xp0-rp ) ? Vector [0,0,-1]:  // X[] >= 0
+                  ( Y[]<= _tmp_pri  && X[] >=0 && Z[] >=xp0-rp) ? Vector [1,0,0]: 
                     Unit [ Vector [ _tmp_omega*Z[], -Ap ,-_tmp_omega*X[] ] ] );
-  vDir[#{Secondary0,Secondary1}] = ( (Y[] >= ys0-rs && Z[] >=0 && X[] >=0 ) ? Vector [0,0,-1]:
-                    ( Y[]<=  _tmp_sec && X[] >=0 && Z[] >=0) ? Vector [1,0,0]:
+  vDir[#{Secondary0}] = ( (Y[] >= ys0-rs && Z[] >=0 && X[] >=xs0-rs ) ? Vector [0,0,-1]:
+                    ( Y[]<=  _tmp_sec && X[] >=0 && Z[] >=xs0-rs) ? Vector [1,0,0]:
                       Unit [ Vector [ _tmp_omega*Z[], -As ,-_tmp_omega*X[] ] ] );
-	
+  vDir[#{Secondary1}] = ( (Y[] >= ys0-rs && Z[] >=0 && X[] >=xs1-rs ) ? Vector [0,0,-1]:
+                    ( Y[]<=  _tmp_sec && X[] >=0 && Z[] >=xs1-rs ) ? Vector [1,0,0]:
+                      Unit [ Vector [ _tmp_omega*Z[], -As ,-_tmp_omega*X[] ] ] );	
 	
   SurfCoil[Primary]    = SurfaceArea[]{IN_PRI};
   SurfCoil[Secondary0] = SurfaceArea[]{IN_SEC0};
