@@ -102,8 +102,9 @@ Group{
   // Generated automatically with Homology
   // md = 1.5, using pri-2 sec0-1 sec1-3
   // withe 07.msh file using pri-1 sec0-3 sec1-2
-  Cut_Primary    = #{1002102}; // Default: pri-1 sec0-2 sec1-3
-  Cut_Secondary0 = #{1002101}; //1
+  // with 7:6 1.msh using pri-2 sec0-1 sec1-3
+  Cut_Primary    = #{1002101}; // Default: pri-1 sec0-2 sec1-3
+  Cut_Secondary0 = #{1002102}; //1
   Cut_Secondary1 = #{1002103};
  
 
@@ -578,7 +579,7 @@ Constraint {
     Case {
       { Region SurfCutB~{1}; Value Nw_pri ; }
       { Region SurfCutB~{2}; Value Nw_sec0 ; }
-      { Region SurfCutB~{3}; Value Nw_sec1 ; }
+      { Region SurfCutB~{3}; Value -Nw_sec1 ; } // Only for 7:6 1.5
     }
   }
 
@@ -939,7 +940,7 @@ PostProcessing {
               In Domain ; Jacobian Vol ; Integration II ; }
 			Else
               Integral {[ SymmetryFactor * SquNorm[ 1/AreaCell[] * {d hs} ]/(fill[]*sigma[]) ] ;
-              In Domain ; Jacobian Vol ; Integration II ; }
+              In Domain ; Jacobian Vol ; Integration II ; }			  
 			EndIf
 	      EndIf
 		  
@@ -1019,8 +1020,17 @@ PostProcessing {
 			
 	  { Name Lac ;
       Value {
-	  Term { Type Global; [ Im[{Uz}/{Iz}]/(2*Pi*Freq) ] ; In DomainZt_Cir ;  } } }		  
+	  Term { Type Global; [ Im[{Uz}/{Iz}]/(2*Pi*Freq) ] ; In DomainZt_Cir ;  } } }
 
+      { Name P_skin ; Value { // Joule Losses -- total skin losses
+          Term { [  0.5*Resistance[] * SquNorm[{Iz}] ]; In DomainZt_Cir; }
+        }
+      }
+      { Name P_prox ; Value { // Joule Losses -- total skin losses
+          // Integral { [ 0.5*Re[{d a}*Conj[2*Pi*Freq*nu[]*{d a}]] ]; In DomainB ; Jacobian Vol ; Integration II ; }
+          Integral { [ 0.5*SquNorm[{d a}]*2*Pi*Freq*Im[nu[]] ]; In DomainB ; Jacobian Vol ; Integration II ; }
+        }
+      }
 	EndIf  
 
 	  
@@ -1109,6 +1119,8 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
 	If (IA_pri != 0)
       Print[ Rac, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Rac_pri",ExtGnuplot],
         SendToServer StrCat[pcp,"4Rac_pri [Ohm]"]{0}, Color "LightYellow"];
+/*       Print[ P_skin, OnRegion Rz_pri, Format TimeTable, File > StrCat[Dir,"Rac_pri",ExtGnuplot],
+        SendToServer StrCat[pcp,"4Rac_pri [Ohm]"]{0}, Color "LightYellow"];		 */
 	EndIf		
 
 	If (IA_sec0 != 0 && IA_sec1 != 0)	
@@ -1139,6 +1151,10 @@ PostOperation Get_GlobalQuantities UsingPost MagStaDyn_av_js0_3D {
         SendToServer StrCat[pcp,"2Vpk pri [V]"]{0}, Color "LightYellow"];
       Print[ Uph, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"VoltagePriPh",ExtGnuplot],
         SendToServer StrCat[pcp,"3Phase V pri [degree]"]{0}, Color "LightYellow"];
+      Print[ P_skin, OnRegion Rz_pri, Format TimeTable, File > StrCat[Dir,"SkinLoss",ExtGnuplot],
+        SendToServer StrCat[pcp,"4Skin loss [W]"]{0}, Color "LightYellow"];		
+      Print[ P_prox[#{Primary,Secondary0}], OnGlobal, Format TimeTable, File > StrCat[Dir,"ProximityLoss",ExtGnuplot],
+        SendToServer StrCat[pcp,"5Proximity loss [W]"]{0}, Color "LightYellow"];
 		
       If (IA_pri != 0)
         Print[ Lac, OnRegion VI_source_pri, Format TimeTable, File > StrCat[Dir,"Lac_pri",ExtGnuplot],
